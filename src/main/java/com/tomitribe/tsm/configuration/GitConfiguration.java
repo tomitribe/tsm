@@ -46,7 +46,7 @@ public class GitConfiguration {
     private static final String NO_PASSPHRASE = "no";
 
     private String branch;
-    private File sshKey;
+    private String sshKey;
     private String sshPassphrase;
     private String base;
     private String repository;
@@ -60,7 +60,7 @@ public class GitConfiguration {
         this.base = base;
         this.repository = repo;
         this.branch = branch;
-        this.sshKey = ofNullable(sshKey).map(Substitutors::resolveWithVariables).map(File::new).orElse(null);
+        this.sshKey = ofNullable(sshKey).map(Substitutors::resolveWithVariables).orElse(null);
         this.sshPassphrase = Substitutors.resolveWithVariables(sshPassphrase);
     }
 
@@ -81,13 +81,13 @@ public class GitConfiguration {
                     }
 
                     @Override
-                    protected JSch createDefaultJSch(FS fs) throws JSchException {
+                    protected JSch createDefaultJSch(final FS fs) throws JSchException {
                         final JSch jSch = super.createDefaultJSch(fs);
-                        if (sshKey.isFile()) {
+                        if (new File(sshKey).isFile()) {
                             if (hasPassphrase) {
-                                jSch.addIdentity(sshKey.getAbsolutePath(), sshPassphrase);
+                                jSch.addIdentity(sshKey, sshPassphrase);
                             } else {
-                                jSch.addIdentity(sshKey.getAbsolutePath());
+                                jSch.addIdentity(sshKey);
                             }
                         } // else handled by jgit
                         return jSch;
