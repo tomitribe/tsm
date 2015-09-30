@@ -51,7 +51,7 @@ public class ApplicationTest {
         Application.start(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-start-work/"),
+            new File("target/ApplicationTest-start-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-start", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "start", new PrintStream(out));
 
@@ -67,7 +67,7 @@ public class ApplicationTest {
         Application.stop(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-stop-work/"),
+            new File("target/ApplicationTest-stop-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "stop", new PrintStream(out));
 
@@ -83,7 +83,7 @@ public class ApplicationTest {
         Application.ping(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-ping-work/"),
+            new File("target/ApplicationTest-ping-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "ping", new PrintStream(out));
 
