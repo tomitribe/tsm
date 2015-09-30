@@ -68,11 +68,12 @@ public class Application {
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                             @Option("node-index") @Default("-1") final int nodeIndex,
                              final GitConfiguration git,
                              final String artifactId,
                              @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
@@ -80,11 +81,12 @@ public class Application {
     public static void stop(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                            @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" -force");
     }
 
@@ -92,23 +94,25 @@ public class Application {
     public static void restart(@Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                               @Option("node-index") @Default("-1") final int nodeIndex,
                                final GitConfiguration git,
                                final String artifactId,
                                @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
-            "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 1", "\"%s/bin/startup\"");
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void ping(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                            @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Testing %s on %s for environment %s", e -> {
                 final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
                 return new String[]{ // GET is often in PCI zones but not curl so try it first
@@ -607,9 +611,10 @@ public class Application {
                                 final GitConfiguration git,
                                 final String artifactId,
                                 final PrintStream out,
+                                final int nodeIndex,
                                 final String textByHost,
                                 final String... cmds) throws IOException {
-        execute(environment, sshKey, workDirBase, git, artifactId, out, textByHost, e -> cmds);
+        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds);
     }
 
     private static void execute(final String environment,
@@ -618,6 +623,7 @@ public class Application {
                                 final GitConfiguration git,
                                 final String artifactId,
                                 final PrintStream out,
+                                final int nodeIndex,
                                 final String textByHost,
                                 final Function<Deployments.Environment, String[]> cmdBuilder) throws IOException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId);
@@ -629,7 +635,11 @@ public class Application {
             final Deployments.Environment env = app.findEnvironment(environment);
             validateEnvironment(environment, artifactId, env);
 
+            final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
+                if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
+                    return;
+                }
                 out.println(String.format(textByHost, artifactId, host, environment));
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
