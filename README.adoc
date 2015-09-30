@@ -291,7 +291,7 @@ JVM:
 - 8u20
 - 8u11
 - 8
-rmannibu@rmannibu668864:~  $ java -jar tsn-bundle.jar java8 install myapp 8u60
+rmannibu@rmannibu668864:~  $ java -jar tsm-bundle.jar java8 install myapp 8u60
 Using locally cached JDK.
 Downloaded JDK in /var/folders/3t/p70rh85n22n50fyjqqynysjh000_dw/T/tsm/java8-install-36516862107050/jdk-8u60.tar.gz (181238643 bytes)
 remote: Counting objects: 15
