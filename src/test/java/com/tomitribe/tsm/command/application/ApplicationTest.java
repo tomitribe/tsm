@@ -165,7 +165,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
-            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", false,
+            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, false,
             new PrintStream(out), new PrintStream(err));
 
         assertEquals(asList(

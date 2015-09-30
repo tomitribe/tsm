@@ -45,6 +45,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -191,13 +192,14 @@ public class Application {
                                          @Option("java-version") final String javaVersion,
                                          @Option("environment") final String environment,
                                          final String artifactId, // ie application in git
+                                         @Option("node-index") @Default("-1") final int nodeIndex,
                                          @Option("as-service") final boolean asService,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            asService, out, err);
+            nodeIndex, asService, out, err);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -211,6 +213,7 @@ public class Application {
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String environment,
                                final String groupId, final String artifactId, final String version,
+                               @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
@@ -260,11 +263,15 @@ public class Application {
             final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
             final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
                 .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+            final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
                 out.println("Deploying " + artifactId + " on " + host);
 
                 // override by host variables
                 byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
+                if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
+                    return;
+                } // else deploy
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                     final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
