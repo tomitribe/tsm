@@ -9,6 +9,8 @@
  */
 package com.tomitribe.tsm.command.application;
 
+import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
+import com.tomitribe.crest.provisioning.ssh.Ssh;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
@@ -17,8 +19,6 @@ import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
 import com.tomitribe.tsm.file.TempDir;
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.ssh.Ssh;
 import lombok.NoArgsConstructor;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +53,11 @@ import java.util.stream.Stream;
 import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static lombok.AccessLevel.PRIVATE;
 
 @Command("application")
@@ -255,8 +258,13 @@ public class Application {
 
             final AtomicReference<String> chosenTribestreamVersion = new AtomicReference<>(tribestreamVersion);
             final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
+            final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
+                .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
             env.getHosts().forEach(host -> {
                 out.println("Deploying " + artifactId + " on " + host);
+
+                // override by host variables
+                byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                     final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
@@ -545,6 +553,8 @@ public class Application {
         if (ofNullable(env.getHosts()).orElse(emptyList()).isEmpty()) {
             throw new IllegalArgumentException("No host for application " + artifactId);
         }
+
+        env.validate();
 
         // fill default built-in properties if not present
         if (env.getProperties() == null) {

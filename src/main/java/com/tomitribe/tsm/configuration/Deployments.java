@@ -13,6 +13,7 @@ import lombok.Data;
 import org.apache.johnzon.mapper.MapperBuilder;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -23,6 +24,7 @@ public interface Deployments {
     class Application {
         private final String name;
         private final Map<String, String> properties;
+        private Map<String, List<String>> byHostProperties;
         private final Collection<Environment> environments;
 
         public Environment findEnvironment(final String environment) {
@@ -40,12 +42,22 @@ public interface Deployments {
     @Data
     class Environment {
         private Map<String, String> properties;
+        private Map<String, List<String>> byHostProperties;
         private Collection<String> libs;
         private Collection<String> webapps;
         private final Collection<String> names;
         private final Collection<String> hosts;
         private final String base;
         private final String user;
+
+        public void validate() {
+            final Integer expectedSize = ofNullable(hosts).map(Collection::size).orElse(0);
+            ofNullable(byHostProperties).ifPresent(m -> m.values().forEach(l -> {
+                if (l.size() != expectedSize) {
+                    throw new IllegalArgumentException("byHostProperties values size should be the same as for the hosts list");
+                }
+            }));
+        }
     }
 
     static Application read(final java.io.Reader stream) {
