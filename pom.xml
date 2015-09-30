@@ -204,11 +204,6 @@
 
   <repositories>
     <repository>
-      <id>starbucks-releases</id>
-      <name>Starbucks Snapshot Repository</name>
-      <url>http://nexus.starbucks.net/content/groups/releases/</url>
-    </repository>
-    <repository>
       <id>tomitribe-all</id>
       <name>Tomitribe Repository</name>
       <url>http://repository.tomitribe.com/content/groups/tomitribe/</url>
