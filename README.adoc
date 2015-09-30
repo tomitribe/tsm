@@ -1,0 +1,400 @@
+= Tribestream Server Management tool
+
+== Target
+
+- UNIx servers (should get tar/mv/rm/chmod commands at least)
+- Provisioning is done through SSH to servers (no need to be on servers)
+- Machine executing the provisioning needs access to github, nexus, oracle.com, tomitribe.com - depends on the command
+
+== Usage
+
+- Setup a JDK 8 on the machine (jumpbox or local, it needs to have access to github, nexus and potentially the internet - oracle website)
+- Setup git repository - see Git part
+- Use the run script
+
+== Git setup
+
+Git will hold the configuration. The configuration is done by app and is in an folder called as the application (artifactId).
+
+Here is a sample:
+
+[source,javascript]
+----
+{
+  /* you can write comment like that */
+  // or inline
+  "applications": [
+    {
+      "name": "java8",
+      "environments": [
+        {
+          "names": [
+            "ps",
+            "pd"
+          ],
+          "hosts": [
+            "h1",
+            "h2"
+          ],
+          "base": "/opt/java8",
+          "user": "aspadm"
+        },
+        {
+          "names": [
+            "prod"
+          ],
+          "hosts": [
+            "h3",
+            "h4",
+            "h5",
+            "h6"
+          ],
+          "base": "/opt/java8",
+          "user": "aspprodadm"
+        }
+      ]
+    },
+    ...
+  ]
+}
+----
+
+The configuration is composed of a list of applications. An application has a name and a list of environments.
+Environment define templates for the application for a set of environments (identified by names list). These templates
+define the related hosts, the base of the setup for the application and the ssh user.
+
+Then you can create a `tribestream` folder in the application folder containing `bin/`, `conf/`, `lib/` folders.
+They are synchronized when installing the application. Properties, XML and yaml files - identified by extension - are filtered
+using application and environment properties - use "properties" json property filled as a map. Some built in properties are provided by the framework:
+
+|===
+| Name | Value
+| tsm.environment | the environment name
+| tsm.http | depending on the environment, missing if environment is not found
+| tsm.https | depending on the environment, missing if environment is not found
+| tsm.shutdown | depending on the environment, missing if environment is not found
+| tsm.portMarker | thousand digit of the ports, depends on the environment, missing if environment is not found
+|===
+
+TIP: if you need a default in case the environment is missing you can use this syntax: `${key:-default}` in filtered files.
+
+== tsmrc
+
+For common configuration you can create a `.tsmrc` file in your home containing some global configuration like:
+
+[source]
+----
+git.repository: org/deployment-repo
+git.sshPassphrase: base64:xxxx
+
+ssh.passphrase: base64:xxxxx
+
+www.tomitribe.com.username: myuser
+www.tomitribe.com.password: base64:xxxxxx
+
+nexus.url: https://nexus.company.net/content/groups/company-all/
+----
+
+NOTE: most of the time this repository should be private.
+
+
+== Commands
+
+=== Java8
+
+==== List versions
+
+This commands aims to list available JDKs on oracle website.
+
+WARNING: it uses HTML parsing so can be broken if oracle updates its website.
+
+Usage:
+
+[source]
+----
+java8 versions
+----
+
+==== Install
+
+If you setup `.tsmrc` and use default configuration file the command should look like:
+
+[source]
+----
+java8 install <app> <version>
+----
+
+For instance
+
+[source]
+----
+java8 install myapp 8u60
+----
+
+NOTE: by default before downloading on Oracle website the command checks ~/.m2/repository/com/oracle/jdk/${version}/jdk/jdk-${version}.tar.gz existence
+and uses this local file if present instead of downloading the JDK.
+
+=== Tribestream
+
+==== List versions
+
+This commands aims to list available Tribestream from Tomitribe website.
+
+Usage:
+
+[source]
+----
+tribestream versions
+----
+
+==== Install
+
+If you setup `.tsmrc` and use default configuration file the command should look like:
+
+[source]
+----
+tribestream install <app> <version>
+----
+
+For instance
+
+[source]
+----
+tribestream install myapp 0.67
+----
+
+NOTE: by default before downloading on Oracle website the command checks ~/.m2/repository/com/tomitribe/tribestream/tribestream/${version}/tribestream/tribestream-${version}.zip existence
+and uses this local file if present instead of downloading the server.
+
+=== Applications
+
+==== List versions
+
+List available versions for a particular artifact (uses nexus):
+
+[source]
+----
+application versions {groupId} {artifactId}
+----
+
+For instance:
+
+[source]
+----
+application versions com.company.team application
+----
+
+==== Install
+
+Install an application from nexus + git with a particular java and tribestream version.
+
+[source]
+----
+application install {groupId} {artifactId} {version}
+----
+
+For instance:
+
+[source]
+----
+application install com.company.team application 1.0
+----
+
+or to get a fully automatic installation without any prompting:
+
+[source]
+----
+application install com.company.team myapp 1.0-SNAPSHOT --tribestream-version=0.68 --java-version=8u60
+----
+
+NOTE: if you miss some parameters like java or tribestream versions you will get prompted about it.
+
+IMPORTANT: use the artifactId as application name to avoid mismatch reading the configuration in git.
+
+IMPORTANT: to be able to *update* servers you need to provide a shutdown script in bin/ (see git repository structure part to know how to do so).
+
+IMPORTANT: if you specified tribestream and java versions no validation is done on these so ensure they are setup.
+
+==== Start
+
+[source]
+----
+application install start application --environment=pd
+----
+
+NOTE: environment is optional, default is pd
+
+==== Stop
+
+[source]
+----
+application install stop application --environment=pd
+----
+
+NOTE: environment is optional, default is pd
+
+==== Restart
+
+[source]
+----
+application install restart application --environment=pd
+----
+
+NOTE: environment is optional, default is pd
+
+==== Ping
+
+[source]
+----
+application install ping application --environment=pd
+----
+
+NOTE: environment is optional, default is pd
+
+NOTE: `ping` is doing a `GET` or a `curl` locally to ensure the port is open, it supposes the server is bound to `localhost` or `*`, response is just logged in the console.
+
+==== Install a tar.gz
+
+This command is intended to provision a custom binary on the server:
+
+[source]
+----
+application install-tar.gz application mysql:mysql-server:5.6.25:linux-glibc2.5-x86_64 --nexus.url=https://nexus.company.net/content/repositories/thirdparty/
+----
+
+It will grab mysql-server tar.gz on nexus and upload it in the right folder for the selected application.
+
+NOTE: default repository is snapshots/releases ones but mysql is in 3rd party one so we need to specify its url.
+
+== Note to administrators
+
+Recommandations and potential future developments:
+
+- ensure artifacts are "locally" available (locally can means limit it to a company nexus or even to the machine)
+- surely more fine grained commands like `application update-tribestream-version` or `application update-java-version` to avoid to re-setup a while instance for such small updates
+- surely less fine grained commands like `application install-and-start`
+- windows version, maybe at least tsm.bat?
+
+== Sample sequence of commands
+
+[source]
+----
+rmannibu@rmannibu668864:~  $ java -jar tsm-bundle.jar java8 versions
+JVM:
+- 8u60
+- 8u51
+- 8u5
+- 8u45
+- 8u40
+- 8u31
+- 8u25
+- 8u20
+- 8u11
+- 8
+rmannibu@rmannibu668864:~  $ java -jar tsn-bundle.jar java8 install myapp 8u60
+Using locally cached JDK.
+Downloaded JDK in /var/folders/3t/p70rh85n22n50fyjqqynysjh000_dw/T/tsm/java8-install-36516862107050/jdk-8u60.tar.gz (181238643 bytes)
+remote: Counting objects: 15
+remote: Compressing objects: 100% (12/12)
+Receiving objects:      100% (15/15)
+Resolving deltas:       100% (2/2)
+Updating references:    100% (1/1)
+Deploying jdk 8u60 on localhost
+Installing JDK on localhost [==================================================] 3s
+x README.html
+x LICENSE
+x include/
+x include/jawt.h
+x include/linux/
+x include/linux/jawt_md.h
+x include/linux/jni_md.h
+x include/classfile_constants.h
+x include/jvmticmlr.h
+x include/jni.h
+x include/jdwpTransport.h
+x include/jvmti.h
+x THIRDPARTYLICENSEREADME-JAVAFX.txt
+x lib/
+x lib/ct.sym
+x lib/orb.idl
+x lib/missioncontrol/
+x lib/missioncontrol/artifacts.xml
+x lib/missioncontrol/dropins/
+x lib/missioncontrol/dropins/README.TXT
+x lib/missioncontrol/plugins/
+....
+JDK setup in /opt/sandbox/provisioning/java/jdk-8u60/ for host localhost
+rmannibu@rmannibu668864:~  $ java -jar tsm-current-bundle.jar tribestream versions
+Tribestream:
+- 0.68
+- 0.67
+- 0.66
+- 0.65.1
+- 0.65
+- 0.64
+- 0.63.5
+- 0.62.1
+- 0.61.2
+- 0.60
+- 0.57.2
+mannibu@rmannibu668864:~  $ java -jar tsm-current-bundle.jar tribestream install myapp 0.68
+Didn't find cached Tribestream in /Users/rmannibu/.m2/repository/com/tomitribe/tribestream/tribestream/0.68/tribestream-0.68.tar.gz so trying to download it for this provisioning.
+Downloading Tribestream, please wait...
+Downloaded Tribestream in /var/folders/3t/p70rh85n22n50fyjqqynysjh000_dw/T/tsm/tribestream-install-36634500661748/tribestream-0.68.tar.gz (72073698 bytes)
+remote: Counting objects: 15
+remote: Compressing objects: 100% (12/12)
+Receiving objects:      100% (15/15)
+Resolving deltas:       100% (2/2)
+Updating references:    100% (1/1)
+Deploying Tribestream 0.68 on localhost
+Installing Tribestream on localhost [==================================================] 1s
+x bin/tribe
+x lib/tomitribe-crest-0.4.jar
+x lib/tomitribe-crest-api-0.4.jar
+x lib/tomitribe-util-1.2.1.jar
+x lib/geronimo-validation_1.0_spec-1.1.jar
+x lib/tribestream-cli-0.68.jar
+x lib/service-documentation-api-1.0.1.jar
+x lib/tribestream-api-0.68.jar
+x lib/tribestream-tree-0.68.jar
+x lib/tribestream-container-0.68.jar
+...
+Tribestream setup in /opt/sandbox/provisioning/tribestream/tribestream-0.68/ for host localhost
+rmannibu@rmannibu668864:~  $ java -jar tsm-current-bundle.jar application versions com.company.team myapp
+Metadata for com.company.team:myapp:
+- last update: 20150909000541
+- lastest version: 1.0-SNAPSHOT
+- available versions:
+-- 1.0-SNAPSHOT
+rmannibu@rmannibu668864:~  $ java -jar tsm-current-bundle.jar application install com.company.team myapp 1.0-SNAPSHOT
+Using locally cached myapp.
+remote: Counting objects: 15
+remote: Compressing objects: 100% (12/12)
+Receiving objects:      100% (15/15)
+Resolving deltas:       100% (2/2)
+Updating references:    100% (1/1)
+Deploying myapp on localhost
+You didn't set a tribestream version, please select one:
+- 0.68
+Enter the tribestream version: 0.68
+You didn't set a jdk version, please select one:
+- 8u60
+Enter the jdk version: 8u60
+Uploading myapp on localhost [==================================================] 0s
+No tribestream configuration found.
+Uploading updated setenv.sh [==================================================] 0s
+Uploading script processes [==================================================] 0s
+Uploading script processes [==================================================] 0s
+Uploading script processes [==================================================] 0s
+Uploading script processes [==================================================] 0s
+Uploading script processes [==================================================] 0s
+Uploading deployment metadata [==================================================] 0s
+myapp setup in /opt/sandbox/provisioning/myapp/pd/ for host localhost, you can now use start command.
+----
+
+
+== TODO
+
+
+- log commands (passthrough for tail/grep?)
+

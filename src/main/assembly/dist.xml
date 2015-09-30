@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--
+  Tomitribe Confidential
+  Copyright Tomitribe Corporation. 2015
+  The source code for this program is not published or otherwise divested
+  of its trade secrets, irrespective of what has been deposited with the
+  U.S. Copyright Office.
+-->
+<assembly>
+  <id>distribution</id>
+  <formats>
+    <format>tar.gz</format>
+    <format>zip</format>
+  </formats>
+  <dependencySets>
+    <dependencySet>
+      <useProjectArtifact>false</useProjectArtifact> <!-- see fileSets -->
+      <outputDirectory>lib</outputDirectory>
+      <unpack>false</unpack>
+    </dependencySet>
+  </dependencySets>
+  <fileSets>
+    <fileSet>
+      <directory>${project.build.directory}</directory>
+      <outputDirectory>lib</outputDirectory>
+      <includes> <!-- don't include bundle -->
+        <include>${project.build.finalName}.${project.packaging}</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${project.basedir}/src/main/script/</directory>
+      <outputDirectory>bin</outputDirectory>
+      <fileMode>0755</fileMode>
+    </fileSet>
+  </fileSets>
+</assembly>

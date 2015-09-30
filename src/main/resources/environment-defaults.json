@@ -1,0 +1,51 @@
+{
+  "pd":{
+    "tsm.http": 7080,
+    "tsm.https": 7443,
+    "tsm.shutdown": 7005,
+    "tsm.portMarker": 7,
+    "tsm.environment": "pd"
+  },
+  "pi":{
+    "tsm.http": 6080,
+    "tsm.https": 6443,
+    "tsm.shutdown": 6005,
+    "tsm.portMarker": 6,
+    "tsm.environment": "pi"
+  },
+  "ps":{
+    "tsm.http": 5080,
+    "tsm.https": 5443,
+    "tsm.shutdown": 5005,
+    "tsm.portMarker": 5,
+    "tsm.environment": "ps"
+  },
+  "sd":{
+    "tsm.http": 4080,
+    "tsm.https": 4443,
+    "tsm.shutdown": 4005,
+    "tsm.portMarker": 4,
+    "tsm.environment": "sd"
+  },
+  "ss":{
+    "tsm.http": 3080,
+    "tsm.https": 3443,
+    "tsm.shutdown": 3005,
+    "tsm.portMarker": 3,
+    "tsm.environment": "ss"
+  },
+  "ct":{
+    "tsm.http": 8080,
+    "tsm.https": 8443,
+    "tsm.shutdown": 8005,
+    "tsm.portMarker": 8,
+    "tsm.environment": "ct"
+  },
+  "prod":{
+    "tsm.http": 8080,
+    "tsm.https": 8443,
+    "tsm.shutdown": 8005,
+    "tsm.portMarker": 8,
+    "tsm.environment": "prod"
+  }
+}
