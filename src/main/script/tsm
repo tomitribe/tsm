@@ -42,4 +42,4 @@ done
 #
 echo -e "Using tsm.home=$TSM_HOME | java=$JAVA_PATH\n"
 
-"$JAVA_PATH" -cp "$tsm_classpath" com.sbux.asp.tsm.Tsm $@
+"$JAVA_PATH" -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@
