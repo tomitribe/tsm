@@ -30,6 +30,7 @@ import org.tomitribe.crest.api.Option;
 import org.tomitribe.crest.api.Options;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Writer;
 import java.util.Locale;
 import java.util.stream.Stream;
@@ -38,6 +39,8 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
+import static org.eclipse.jgit.api.ResetCommand.ResetType.HARD;
+import static org.eclipse.jgit.lib.Constants.HEAD;
 
 @Data
 @Options
@@ -128,5 +131,13 @@ public class GitConfiguration {
 
     public String repository() {
         return base.startsWith("file:") ? base : base + ":" + repository + ".git";
+    }
+
+    public void reset(final File deploymentConfig) {
+        try {
+            Git.open(deploymentConfig).reset().setMode(HARD).setRef(HEAD).call();
+        } catch (final GitAPIException | IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

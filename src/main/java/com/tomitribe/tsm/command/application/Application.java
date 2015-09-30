@@ -444,6 +444,7 @@ public class Application {
 
                     out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
 
+                    git.reset(deploymentConfig.getParentFile().getParentFile());
                     // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
                 }
             });
