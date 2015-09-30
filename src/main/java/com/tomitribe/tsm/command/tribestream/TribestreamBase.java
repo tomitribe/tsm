@@ -9,6 +9,9 @@
  */
 package com.tomitribe.tsm.command.tribestream;
 
+import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
+import com.tomitribe.crest.provisioning.http.Http;
+import com.tomitribe.crest.provisioning.ssh.Ssh;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
@@ -16,15 +19,16 @@ import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.file.TempDir;
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.http.Http;
-import com.tomitribe.crest.provisioning.ssh.Ssh;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
 import org.tomitribe.util.IO;
 import org.tomitribe.util.Size;
 import org.tomitribe.util.SizeUnit;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.script.ScriptException;
 import java.io.File;
 import java.io.FileReader;
@@ -33,6 +37,9 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -68,8 +75,37 @@ class TribestreamBase {
 
             String token;
             final String pathWithVersion = "com.tomitribe.tribestream/" + artifactId + "/" + version + "/tar.gz";
-            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("http://www.tomitribe.com/downloads/api/catalog/token/" + pathWithVersion).openConnection());
+            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/token/" + pathWithVersion).openConnection());
             try {
+                if (HttpsURLConnection.class.isInstance(urlConnection)) {
+                    final HttpsURLConnection httpsURLConnection = HttpsURLConnection.class.cast(urlConnection);
+                    httpsURLConnection.setHostnameVerifier((s, sslSession) -> true);
+
+                    try {
+                        final SSLContext context = SSLContext.getInstance("SSL");
+                        context.init(null, new TrustManager[]{
+                            new X509TrustManager() {
+                                @Override
+                                public void checkClientTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
+                                    // no-op
+                                }
+
+                                @Override
+                                public void checkServerTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
+                                    // no-op
+                                }
+
+                                @Override
+                                public X509Certificate[] getAcceptedIssuers() {
+                                    return null;
+                                }
+                            }
+                        }, new SecureRandom());
+                        httpsURLConnection.setSSLSocketFactory(context.getSocketFactory());
+                    } catch (final Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
                 urlConnection.setRequestProperty("Authorization", security.getAuthorization());
                 urlConnection.setRequestProperty("accept-licence", "true");
                 token = IO.slurp(urlConnection.getInputStream());
@@ -78,7 +114,7 @@ class TribestreamBase {
             }
             out.println("Downloading " + displayName + ", please wait...");
             new Http().download(
-                "http://www.tomitribe.com/downloads/api/catalog/get/" + pathWithVersion + "?token=" + token, downloadedFile,
+                "https://www.tomitribe.com/downloads/api/catalog/get/" + pathWithVersion + "?token=" + token, downloadedFile,
                 null /* don't use new ProgressBar(out, "Downloading Tribestream " + version) since we don't have Content-Length for now here */);
         }
         out.println("Downloaded " + displayName + " in " + downloadedFile + " (" + new Size(downloadedFile.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
@@ -138,7 +174,7 @@ class TribestreamBase {
                          final boolean includeSnapshots,
                          final PrintStream ps) throws IOException {
         final List<String> lists = new ArrayList<>();
-        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("http://www.tomitribe.com/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
+        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
         try {
             urlConnection.setRequestProperty("Accept", "application/json");
             urlConnection.setRequestProperty("Authorization", security.getAuthorization());
