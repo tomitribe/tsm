@@ -50,6 +50,11 @@ public class Tsm {
                 private final String prompt = "tsm @ " + Tsm.class.getPackage().getImplementationVersion() + "$ ";
 
                 @Override
+                protected File aliasesFile() {
+                    return new File(System.getProperty("user.home"), ".tomitribe/tsm_aliases");
+                }
+
+                @Override
                 protected File cliHistoryFile() {
                     return new File(System.getProperty("user.home"), ".tomitribe/tsm_history");
                 }
