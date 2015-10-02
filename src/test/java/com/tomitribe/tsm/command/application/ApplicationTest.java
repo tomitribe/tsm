@@ -102,7 +102,7 @@ public class ApplicationTest {
             new File("target/ApplicationTest-tg-work/"),
             new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             new LocalFileRepository(new File("target/missing")),
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId,final  String artifactId, final String version,
@@ -133,7 +133,7 @@ public class ApplicationTest {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final ByteArrayOutputStream err = new ByteArrayOutputStream();
         Application.install(
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId, final String artifactId, final String version,
@@ -147,7 +147,7 @@ public class ApplicationTest {
                     };
                 }
             },
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId, final String artifactId, final String version,
