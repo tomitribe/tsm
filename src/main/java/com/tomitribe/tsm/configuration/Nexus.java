@@ -121,7 +121,7 @@ public class Nexus {
     private String authorization() {
         if (auth == null) {
             try {
-                auth = username == null ? null : printBase64Binary((username + ":" + password).getBytes("UTF-8"));
+                auth = username == null ? null : "Basic " + printBase64Binary((username + ":" + password).getBytes("UTF-8"));
             } catch (final UnsupportedEncodingException e) {
                 throw new IllegalStateException(e);
             }
