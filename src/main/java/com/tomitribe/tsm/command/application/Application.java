@@ -524,7 +524,7 @@ public class Application {
     private static boolean isFilterable(final File file) {
         final String name = file.getName();
         return name.endsWith(".properties") || name.endsWith(".xml") || name.endsWith(".yaml") || name.endsWith(".yml") || name.endsWith(".json")
-            || name.endsWith(".sh");
+            || name.endsWith(".sh") || name.endsWith(".config");
     }
 
     private static String readVersion(final PrintStream out, final PrintStream err,
