@@ -13,6 +13,7 @@ import lombok.Data;
 import org.apache.johnzon.mapper.MapperBuilder;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,6 +61,17 @@ public interface Deployments {
                 if (env.getWebapps() == null) {
                     env.setWebapps(webapps);
                 }
+
+                // avoid NPE
+                if (env.getDeployerProperties() == null) {
+                    env.setDeployerProperties(new HashMap<>());
+                }
+                if (env.getProperties() == null) {
+                    env.setProperties(new HashMap<>());
+                }
+                if (env.getByHostProperties() == null) {
+                    env.setByHostProperties(new HashMap<>());
+                }
             });
 
             return reduce;
@@ -76,6 +88,7 @@ public interface Deployments {
         private Collection<String> hosts;
         private String base;
         private String user;
+        private Map<String, String> deployerProperties;
 
         public void validate() {
             final Integer expectedSize = ofNullable(hosts).map(Collection::size).orElse(0);

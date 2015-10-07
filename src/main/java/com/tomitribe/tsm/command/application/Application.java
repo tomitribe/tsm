@@ -306,7 +306,7 @@ public class Application {
 
                     // synchronizing configuration
                     final List<File> foldersToSyncs = new LinkedList<>();
-                    final List<String> configFolders = asList("tribestream", "tribestream-" + ofNullable(env.getProperties().get("tsm.tribestream.folder")).orElse(environment));
+                    final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, environment));
                     configFolders.forEach(folder -> {
                         final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
                         if (foldersToSync.isDirectory()) {
@@ -460,6 +460,11 @@ public class Application {
                 }
             });
         }
+    }
+
+    private static String envFolder(final Deployments.Environment environment, final String def) {
+        return ofNullable(environment.getProperties().get("tsm.tribestream.folder"))
+            .orElseGet(() -> ofNullable(environment.getDeployerProperties().get("tribestream.folder")).orElse(def));
     }
 
     private static void addScript(final PrintStream out, final Ssh ssh, final Collection<File> foldersToSync, final File workDir,
