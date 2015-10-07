@@ -27,8 +27,13 @@ public interface Deployments {
         private Map<String, List<String>> byHostProperties;
         private final Collection<Environment> environments;
 
+        private Collection<String> libs;
+        private Collection<String> webapps;
+        private String base;
+        private String user;
+
         public Environment findEnvironment(final String environment) {
-            return ofNullable(environments).orElse(emptyList()).stream()
+            final Environment reduce = ofNullable(environments).orElse(emptyList()).stream()
                 .filter(e -> ofNullable(e.getNames()).orElse(emptyList()).contains(environment))
                 .reduce(null, (a, b) -> {
                     if (a == null && b != null) {
@@ -36,6 +41,28 @@ public interface Deployments {
                     }
                     throw new IllegalArgumentException("Environment " + environment + " defined multiple times in deployments.json");
                 });
+
+            // libs/webapps/base/user are merged there == inheritance
+            // not done for properties since this is handled by interpolation logic in aggregation mode
+            // and here we just handle inheritance as overriding
+            ofNullable(reduce).ifPresent(env -> {
+                if (env.getBase() == null) {
+                    env.setBase(base);
+                }
+                if (env.getUser() == null) {
+                    env.setUser(user);
+                }
+
+                // lists are just in override mode, no "merge" logic to avoid misunderstanding
+                if (env.getLibs() == null) {
+                    env.setLibs(libs);
+                }
+                if (env.getWebapps() == null) {
+                    env.setWebapps(webapps);
+                }
+            });
+
+            return reduce;
         }
     }
 
@@ -45,10 +72,10 @@ public interface Deployments {
         private Map<String, List<String>> byHostProperties;
         private Collection<String> libs;
         private Collection<String> webapps;
-        private final Collection<String> names;
-        private final Collection<String> hosts;
-        private final String base;
-        private final String user;
+        private Collection<String> names;
+        private Collection<String> hosts;
+        private String base;
+        private String user;
 
         public void validate() {
             final Integer expectedSize = ofNullable(hosts).map(Collection::size).orElse(0);
