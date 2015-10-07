@@ -26,8 +26,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +36,10 @@ import static java.util.Arrays.asList;
 import static java.util.Optional.ofNullable;
 import static lombok.AccessLevel.PRIVATE;
 
+// tsm can be launched with:
+// - tsm ...
+// - tsm -i # interactive
+// - tsm -i -c mytsmrc # interactive and not default config
 @NoArgsConstructor(access = PRIVATE)
 public class Tsm {
     public static void main(final String[] args) throws Exception {
@@ -44,10 +48,19 @@ public class Tsm {
 
         final GlobalConfiguration configuration = new GlobalConfiguration(new File(tsmRc));
 
-        if (args != null && args.length > 0 && "-i".equals(args[0])) {
-            final Collection<String> options = new ArrayList<>(asList(args));
-            options.remove("-i");
+        final List<String> options = new ArrayList<>(asList(ofNullable(args).orElse(new String[0])));
+        final boolean interactive = options.remove("-i");
+        if (options.size() >= 2) {
+            if ("-c".equals(options.get(0))) {
+                final String pathname = options.get(1);
+                final File newTsmRc = new File(pathname);
+                configuration.reload(newTsmRc);
+                options.remove("-c");
+                options.remove(pathname);
+            }
+        }
 
+        if (interactive) {
             new CrestCli() {
                 private final String prompt = "tsm @ " + Tsm.class.getPackage().getImplementationVersion() + "$ ";
 

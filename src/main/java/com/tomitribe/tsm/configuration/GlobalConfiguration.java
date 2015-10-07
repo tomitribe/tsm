@@ -20,13 +20,7 @@ public final class GlobalConfiguration {
     private final Properties properties = new Properties();
 
     public GlobalConfiguration(final File tsmrcLocation) {
-        if (tsmrcLocation.isFile()) {
-            try {
-                IO.readProperties(tsmrcLocation, properties);
-            } catch (final IOException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
+        reload(tsmrcLocation);
     }
 
     public String read(final String... keys) {
@@ -40,5 +34,16 @@ public final class GlobalConfiguration {
             }
         }
         return null;
+    }
+
+    public void reload(final File tsmrcLocation) {
+        properties.clear();
+        if (tsmrcLocation.isFile()) {
+            try {
+                IO.readProperties(tsmrcLocation, properties);
+            } catch (final IOException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
     }
 }
