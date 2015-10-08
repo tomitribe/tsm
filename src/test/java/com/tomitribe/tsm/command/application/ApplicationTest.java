@@ -71,7 +71,7 @@ public class ApplicationTest {
             new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "stop", new PrintStream(out));
 
-        assertEquals(singletonList("\"/stop/prod/bin/shutdown\" -force"), ssh.commands());
+        assertEquals(singletonList("\"/stop/prod/bin/shutdown\" 1200 -force"), ssh.commands());
         assertTrue(new String(out.toByteArray()).contains("Stopping stop on localhost:" + ssh.port() + " for environment prod"));
     }
 
@@ -169,7 +169,7 @@ public class ApplicationTest {
             new PrintStream(out), new PrintStream(err));
 
         assertEquals(asList(
-            "[ -f \"/art/prod/shutdown\" ] && \"./art/prod/shutdown\" -force",
+            "[ -f \"/art/prod/shutdown\" ] && \"./art/prod/shutdown\" 1200 -force",
             "rm -Rf \"/art/prod/\"",
             "mkdir -p \"/art/prod/\"",
             "cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done",
@@ -239,7 +239,7 @@ public class ApplicationTest {
             "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
             "source \"$proc_script_base/bin/setenv.sh\"\n" +
             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-            "\"$CATALINA_HOME/bin/startup.sh\" \"$@\"\n" +
+            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
             "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
         assertTrue(new String(out.toByteArray()).contains("art setup in /art/prod/ for host localhost:" + ssh.port() + ", you can now use start command."));

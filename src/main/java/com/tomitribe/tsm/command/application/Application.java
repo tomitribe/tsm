@@ -87,7 +87,7 @@ public class Application {
                             @Out final PrintStream out) throws IOException {
         execute(
             environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
-            "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" -force");
+            "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -289,7 +289,7 @@ public class Application {
 
                     ssh
                         // shutdown if running
-                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"." + serverShutdownCmd + "\" -force")
+                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"." + serverShutdownCmd + "\" 1200 -force")
                             // recreate the base folder if needed
                         .exec(String.format("rm -Rf \"%s\"", targetFolder))
                         .exec(String.format("mkdir -p \"%s\"", targetFolder))
@@ -379,7 +379,7 @@ public class Application {
                         out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
                         scriptTop +
                             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                            "\"$CATALINA_HOME/bin/startup.sh\" \"$@\"\n" +
+                            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
                             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
                             "\n");
                     addScript(
