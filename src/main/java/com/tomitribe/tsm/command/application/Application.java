@@ -26,6 +26,8 @@ import org.tomitribe.crest.api.Command;
 import org.tomitribe.crest.api.Default;
 import org.tomitribe.crest.api.Option;
 import org.tomitribe.crest.api.Out;
+import org.tomitribe.crest.cli.api.CliEnvironment;
+import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.util.IO;
 
 import java.io.BufferedReader;
@@ -216,36 +218,39 @@ public class Application {
                                @Option("tribestream-version") final String tribestreamVersion,
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String environment,
-                               final String groupId, final String artifactId, final String version,
+                               final String groupId, final String inArtifactId, final String version,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
-        final String appWorkName = groupId + '_' + artifactId;
+        final String appWorkName = groupId + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
-        final File downloadedFile;
-        if (groupId == null && version == null) {
-            downloadedFile = null;
-            out.println("configuration only, skipping artifacts");
-        } else {
-            downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
-            final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
-            if (cacheFile.isFile()) {
-                out.println("Using locally cached " + artifactId + '.');
-                IO.copy(cacheFile, downloadedFile);
-            } else {
-                out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
-                nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
-            }
-        }
-
-        final File deploymentConfig = gitClone(git, artifactId, out, workDir);
+        final File deploymentConfig = gitClone(git, inArtifactId, out, workDir);
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
             final Deployments.Environment env = app.findEnvironment(environment);
-            validateEnvironment(environment, artifactId, env);
+            validateEnvironment(environment, inArtifactId, env);
+
+            final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
+            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+
+            final File downloadedFile;
+            if (groupId == null && version == null) {
+                downloadedFile = null;
+                out.println("configuration only, skipping artifacts");
+            } else {
+                downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
+                final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
+                if (cacheFile.isFile()) {
+                    out.println("Using locally cached " + artifactId + '.');
+                    IO.copy(cacheFile, downloadedFile);
+                } else {
+                    out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
+                    nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
+                }
+            }
 
             final Collection<File> additionalLibs = new LinkedList<>();
             ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
@@ -273,6 +278,8 @@ public class Application {
 
                 // override by host variables
                 byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
+                env.getProperties().putIfAbsent("host", host);
+
                 if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
                     return;
                 } // else deploy
@@ -284,8 +291,8 @@ public class Application {
                     final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
                     final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
 
-                    final String targetFolder = fixedBase + artifactId + "/" + environment + '/';
-                    final String serverShutdownCmd = targetFolder + "shutdown";
+                    final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (environment + '/'));
+                    final String serverShutdownCmd = targetFolder + "bin/shutdown";
 
                     ssh
                         // shutdown if running
@@ -545,11 +552,22 @@ public class Application {
 
         out.println("You didn't set a " + name + " version, please select one:");
         versions.forEach(v -> out.println("- " + v));
-        out.print("Enter the " + name + " version: ");
+
+        final Environment environment = Environment.ENVIRONMENT_THREAD_LOCAL.get();
+        final boolean isCli = CliEnvironment.class.isInstance(environment);
 
         String v;
         do {
-            v = System.console().readLine();
+            try {
+                if (!isCli) {
+                    out.print("Enter the " + name + " version: ");
+                    v = System.console().readLine();
+                } else {
+                    v = CliEnvironment.class.cast(environment).reader().readLine("Enter the " + name + " version: ");
+                }
+            } catch (final IOException e) {
+                throw new IllegalStateException(e);
+            }
             if (!versions.contains(v)) {
                 err.println("No version " + v + ", please select another one");
                 v = null; // continue
@@ -583,7 +601,7 @@ public class Application {
         env.getProperties().putIfAbsent("base", env.getBase());
         env.getProperties().putIfAbsent("user", env.getUser());
         env.getProperties().putIfAbsent("artifact", artifactId);
-        env.getProperties().putIfAbsent("artifact", artifactId);
+        env.getProperties().putIfAbsent("environment", environment);
     }
 
     private static File gitClone(final GitConfiguration git, final String base,
@@ -640,6 +658,8 @@ public class Application {
             final Deployments.Environment env = app.findEnvironment(environment);
             validateEnvironment(environment, artifactId, env);
 
+            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+
             final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
                 if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
@@ -648,7 +668,7 @@ public class Application {
                 out.println(String.format(textByHost, artifactId, host, environment));
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                    final String targetFolder = env.getBase() + (env.getBase().endsWith("/") ? "" : "/") + artifactId + "/" + environment;
+                    final String targetFolder = env.getBase() + (env.getBase().endsWith("/") ? "" : "/") + artifactId + (skipEnvFolder ? "" : ("/" + environment));
                     asList(cmdBuilder.apply(env)).stream().map(c -> String.format(c, targetFolder)).forEach(ssh::exec);
                 }
             });
