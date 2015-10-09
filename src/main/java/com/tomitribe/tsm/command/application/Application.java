@@ -234,6 +234,7 @@ public class Application {
             validateEnvironment(environment, inArtifactId, env);
 
             final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
+            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
 
             final File downloadedFile;
             if (groupId == null && version == null) {
@@ -288,8 +289,8 @@ public class Application {
                     final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
                     final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
 
-                    final String targetFolder = fixedBase + artifactId + "/" + environment + '/';
-                    final String serverShutdownCmd = targetFolder + "shutdown";
+                    final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (environment + '/'));
+                    final String serverShutdownCmd = targetFolder + "bin/shutdown";
 
                     ssh
                         // shutdown if running
@@ -655,6 +656,8 @@ public class Application {
             final Deployments.Environment env = app.findEnvironment(environment);
             validateEnvironment(environment, artifactId, env);
 
+            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+
             final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
                 if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
@@ -663,7 +666,7 @@ public class Application {
                 out.println(String.format(textByHost, artifactId, host, environment));
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                    final String targetFolder = env.getBase() + (env.getBase().endsWith("/") ? "" : "/") + artifactId + "/" + environment;
+                    final String targetFolder = env.getBase() + (env.getBase().endsWith("/") ? "" : "/") + artifactId + (skipEnvFolder ? "" : ("/" + environment));
                     asList(cmdBuilder.apply(env)).stream().map(c -> String.format(c, targetFolder)).forEach(ssh::exec);
                 }
             });
