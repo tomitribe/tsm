@@ -27,21 +27,28 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
 
 import static java.util.Optional.ofNullable;
+import static javax.xml.bind.DatatypeConverter.printBase64Binary;
 import static javax.xml.bind.annotation.XmlAccessType.FIELD;
 
 @Data
 @Options
 public class Nexus {
+    private String username;
+    private String password;
     private String url;
+    private String auth;
 
-    public Nexus(@Option("nexus.url") final String url) {
+    public Nexus(@Option("nexus.url") final String url, @Option("nexus.username") final String username, @Option("nexus.password") final String pass) {
         setUrl(url);
+        this.username = username;
+        this.password = pass;
     }
 
     public void setUrl(final String url) {
@@ -69,6 +76,10 @@ public class Nexus {
             HttpURLConnection urlConnection = null;
             try {
                 urlConnection = HttpURLConnection.class.cast(new URL(String.format("%s%s/%s/%s/maven-metadata.xml", url, groupId.replace('.', '/'), artifactId, version)).openConnection());
+                final String authorization = authorization();
+                if (authorization != null) {
+                    urlConnection.setRequestProperty("Authorization", authorization);
+                }
                 urlConnection.setRequestProperty("Accept", "application/xml");
                 urlConnection.setRequestProperty("User-Agent", "Chrome");
 
@@ -102,8 +113,20 @@ public class Nexus {
                     url, groupId.replace('.', '/'), artifactId, version, artifactId, actualVersion,
                     classifierPart.isEmpty() ? "" : '-' + classifierPart.substring(1), type),
                 destination,
-                new ProgressBar(out, "Downloading " + groupId + ':' + artifactId + ':' + actualVersion + classifierPart + ':' + type));
+                new ProgressBar(out, "Downloading " + groupId + ':' + artifactId + ':' + actualVersion + classifierPart + ':' + type),
+                authorization() != null ? new String[] { "Authorization", authorization() } : new String[0]);
         };
+    }
+
+    private String authorization() {
+        if (auth == null) {
+            try {
+                auth = username == null ? null : "Basic " + printBase64Binary((username + ":" + password).getBytes("UTF-8"));
+            } catch (final UnsupportedEncodingException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        return auth;
     }
 
     public interface DownloadHandler {

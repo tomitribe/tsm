@@ -10,12 +10,14 @@
 package com.tomitribe.tsm;
 
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
+import jline.console.history.History;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.tomitribe.crest.Main;
 import org.tomitribe.crest.api.Exit;
 import org.tomitribe.crest.cli.api.CliEnvironment;
 import org.tomitribe.crest.cli.api.CrestCli;
+import org.tomitribe.crest.cli.api.InputReader;
 import org.tomitribe.crest.cmds.CommandFailedException;
 import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.crest.environments.SystemEnvironment;
@@ -24,8 +26,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,6 +36,10 @@ import static java.util.Arrays.asList;
 import static java.util.Optional.ofNullable;
 import static lombok.AccessLevel.PRIVATE;
 
+// tsm can be launched with:
+// - tsm ...
+// - tsm -i # interactive
+// - tsm -i -c mytsmrc # interactive and not default config
 @NoArgsConstructor(access = PRIVATE)
 public class Tsm {
     public static void main(final String[] args) throws Exception {
@@ -42,12 +48,26 @@ public class Tsm {
 
         final GlobalConfiguration configuration = new GlobalConfiguration(new File(tsmRc));
 
-        if (args != null && args.length > 0 && "-i".equals(args[0])) {
-            final Collection<String> options = new ArrayList<>(asList(args));
-            options.remove("-i");
+        final List<String> options = new ArrayList<>(asList(ofNullable(args).orElse(new String[0])));
+        final boolean interactive = options.remove("-i");
+        if (options.size() >= 2) {
+            if ("-c".equals(options.get(0))) {
+                final String pathname = options.get(1);
+                final File newTsmRc = new File(pathname);
+                configuration.reload(newTsmRc);
+                options.remove("-c");
+                options.remove(pathname);
+            }
+        }
 
+        if (interactive) {
             new CrestCli() {
                 private final String prompt = "tsm @ " + Tsm.class.getPackage().getImplementationVersion() + "$ ";
+
+                @Override
+                protected File aliasesFile() {
+                    return new File(System.getProperty("user.home"), ".tomitribe/tsm_aliases");
+                }
 
                 @Override
                 protected File cliHistoryFile() {
@@ -60,8 +80,8 @@ public class Tsm {
                 }
 
                 @Override
-                protected CliEnvironment createMainEnvironment(final AtomicReference<InputReader> input) {
-                    return new TsmEnvironment(super.createMainEnvironment(input), configuration);
+                protected CliEnvironment createMainEnvironment(final AtomicReference<InputReader> input, final AtomicReference<History> history) {
+                    return new TsmEnvironment(super.createMainEnvironment(input, history), configuration);
                 }
             }.run(options.toArray(new String[options.size()]));
         } else { // single command
@@ -95,16 +115,6 @@ public class Tsm {
         private final GlobalConfiguration configuration;
 
         @Override
-        public String readInput(final String s) {
-            return cliEnv.readInput(s);
-        }
-
-        @Override
-        public String readPassword(final String s) {
-            return cliEnv.readPassword(s);
-        }
-
-        @Override
         public PrintStream getOutput() {
             return cliEnv.getOutput();
         }
@@ -127,6 +137,21 @@ public class Tsm {
         @Override
         public <T> T findService(final Class<T> service) {
             return service == GlobalConfiguration.class ? service.cast(configuration) : cliEnv.findService(service);
+        }
+
+        @Override
+        public History history() {
+            return cliEnv.history();
+        }
+
+        @Override
+        public InputReader reader() {
+            return cliEnv.reader();
+        }
+
+        @Override
+        public Map<String, ?> userData() {
+            return cliEnv.userData();
         }
     }
 }

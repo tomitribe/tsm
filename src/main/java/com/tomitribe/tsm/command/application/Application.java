@@ -45,6 +45,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -67,11 +68,12 @@ public class Application {
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                             @Option("node-index") @Default("-1") final int nodeIndex,
                              final GitConfiguration git,
                              final String artifactId,
                              @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
@@ -79,35 +81,38 @@ public class Application {
     public static void stop(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                            @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
-            "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" -force");
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void restart(@Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                               @Option("node-index") @Default("-1") final int nodeIndex,
                                final GitConfiguration git,
                                final String artifactId,
                                @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
-            "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 1", "\"%s/bin/startup\"");
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void ping(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                            @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Testing %s on %s for environment %s", e -> {
                 final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
                 return new String[]{ // GET is often in PCI zones but not curl so try it first
@@ -191,13 +196,14 @@ public class Application {
                                          @Option("java-version") final String javaVersion,
                                          @Option("environment") final String environment,
                                          final String artifactId, // ie application in git
+                                         @Option("node-index") @Default("-1") final int nodeIndex,
                                          @Option("as-service") final boolean asService,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            asService, out, err);
+            nodeIndex, asService, out, err);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -211,6 +217,7 @@ public class Application {
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String environment,
                                final String groupId, final String artifactId, final String version,
+                               @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
@@ -260,11 +267,15 @@ public class Application {
             final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
             final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
                 .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+            final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
                 out.println("Deploying " + artifactId + " on " + host);
 
                 // override by host variables
                 byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
+                if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
+                    return;
+                } // else deploy
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                     final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
@@ -278,7 +289,7 @@ public class Application {
 
                     ssh
                         // shutdown if running
-                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"." + serverShutdownCmd + "\" -force")
+                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"." + serverShutdownCmd + "\" 1200 -force")
                             // recreate the base folder if needed
                         .exec(String.format("rm -Rf \"%s\"", targetFolder))
                         .exec(String.format("mkdir -p \"%s\"", targetFolder))
@@ -295,7 +306,7 @@ public class Application {
 
                     // synchronizing configuration
                     final List<File> foldersToSyncs = new LinkedList<>();
-                    final List<String> configFolders = asList("tribestream", "tribestream-" + ofNullable(env.getProperties().get("tsm.tribestream.folder")).orElse(environment));
+                    final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, environment));
                     configFolders.forEach(folder -> {
                         final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
                         if (foldersToSync.isDirectory()) {
@@ -368,7 +379,7 @@ public class Application {
                         out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
                         scriptTop +
                             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                            "\"$CATALINA_HOME/bin/startup.sh\" \"$@\"\n" +
+                            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
                             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
                             "\n");
                     addScript(
@@ -451,6 +462,11 @@ public class Application {
         }
     }
 
+    private static String envFolder(final Deployments.Environment environment, final String def) {
+        return ofNullable(environment.getProperties().get("tsm.tribestream.folder"))
+            .orElseGet(() -> ofNullable(environment.getDeployerProperties().get("tribestream.folder")).orElse(def));
+    }
+
     private static void addScript(final PrintStream out, final Ssh ssh, final Collection<File> foldersToSync, final File workDir,
                                   final String targetFolder, final String name, final String content) {
         if (!foldersToSync.stream().map(f -> new File(f, "bin/" + name)).filter(File::isFile).findAny().isPresent()) {
@@ -508,7 +524,7 @@ public class Application {
     private static boolean isFilterable(final File file) {
         final String name = file.getName();
         return name.endsWith(".properties") || name.endsWith(".xml") || name.endsWith(".yaml") || name.endsWith(".yml") || name.endsWith(".json")
-            || name.endsWith(".sh");
+            || name.endsWith(".sh") || name.endsWith(".config");
     }
 
     private static String readVersion(final PrintStream out, final PrintStream err,
@@ -600,9 +616,10 @@ public class Application {
                                 final GitConfiguration git,
                                 final String artifactId,
                                 final PrintStream out,
+                                final int nodeIndex,
                                 final String textByHost,
                                 final String... cmds) throws IOException {
-        execute(environment, sshKey, workDirBase, git, artifactId, out, textByHost, e -> cmds);
+        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds);
     }
 
     private static void execute(final String environment,
@@ -611,6 +628,7 @@ public class Application {
                                 final GitConfiguration git,
                                 final String artifactId,
                                 final PrintStream out,
+                                final int nodeIndex,
                                 final String textByHost,
                                 final Function<Deployments.Environment, String[]> cmdBuilder) throws IOException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId);
@@ -622,7 +640,11 @@ public class Application {
             final Deployments.Environment env = app.findEnvironment(environment);
             validateEnvironment(environment, artifactId, env);
 
+            final AtomicInteger currentIdx = new AtomicInteger();
             env.getHosts().forEach(host -> {
+                if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
+                    return;
+                }
                 out.println(String.format(textByHost, artifactId, host, environment));
 
                 try (final Ssh ssh = newSsh(sshKey, host, app, env)) {

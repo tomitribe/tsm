@@ -26,7 +26,7 @@
 
   <properties>
     <jgit.version>4.0.1.201506240215-r</jgit.version>
-    <crest.version>0.7-SNAPSHOT</crest.version>
+    <crest.version>0.7</crest.version>
   </properties>
 
   <dependencies>

@@ -51,7 +51,7 @@ public class ApplicationTest {
         Application.start(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-start-work/"),
+            new File("target/ApplicationTest-start-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-start", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "start", new PrintStream(out));
 
@@ -67,11 +67,11 @@ public class ApplicationTest {
         Application.stop(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-stop-work/"),
+            new File("target/ApplicationTest-stop-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "stop", new PrintStream(out));
 
-        assertEquals(singletonList("\"/stop/prod/bin/shutdown\" -force"), ssh.commands());
+        assertEquals(singletonList("\"/stop/prod/bin/shutdown\" 1200 -force"), ssh.commands());
         assertTrue(new String(out.toByteArray()).contains("Stopping stop on localhost:" + ssh.port() + " for environment prod"));
     }
 
@@ -83,7 +83,7 @@ public class ApplicationTest {
         Application.ping(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-ping-work/"),
+            new File("target/ApplicationTest-ping-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "ping", new PrintStream(out));
 
@@ -102,7 +102,7 @@ public class ApplicationTest {
             new File("target/ApplicationTest-tg-work/"),
             new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             new LocalFileRepository(new File("target/missing")),
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId,final  String artifactId, final String version,
@@ -133,7 +133,7 @@ public class ApplicationTest {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final ByteArrayOutputStream err = new ByteArrayOutputStream();
         Application.install(
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId, final String artifactId, final String version,
@@ -147,7 +147,7 @@ public class ApplicationTest {
                     };
                 }
             },
-            new Nexus("http://faked") {
+            new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
                                                 final String groupId, final String artifactId, final String version,
@@ -165,11 +165,11 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
-            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", false,
+            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, false,
             new PrintStream(out), new PrintStream(err));
 
         assertEquals(asList(
-            "[ -f \"/art/prod/shutdown\" ] && \"./art/prod/shutdown\" -force",
+            "[ -f \"/art/prod/shutdown\" ] && \"./art/prod/shutdown\" 1200 -force",
             "rm -Rf \"/art/prod/\"",
             "mkdir -p \"/art/prod/\"",
             "cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done",
@@ -239,7 +239,7 @@ public class ApplicationTest {
             "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
             "source \"$proc_script_base/bin/setenv.sh\"\n" +
             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-            "\"$CATALINA_HOME/bin/startup.sh\" \"$@\"\n" +
+            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
             "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
         assertTrue(new String(out.toByteArray()).contains("art setup in /art/prod/ for host localhost:" + ssh.port() + ", you can now use start command."));
