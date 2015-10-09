@@ -278,6 +278,8 @@ public class Application {
 
                 // override by host variables
                 byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
+                env.getProperties().putIfAbsent("host", host);
+
                 if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
                     return;
                 } // else deploy
