@@ -599,7 +599,7 @@ public class Application {
         env.getProperties().putIfAbsent("base", env.getBase());
         env.getProperties().putIfAbsent("user", env.getUser());
         env.getProperties().putIfAbsent("artifact", artifactId);
-        env.getProperties().putIfAbsent("artifact", artifactId);
+        env.getProperties().putIfAbsent("environment", environment);
     }
 
     private static File gitClone(final GitConfiguration git, final String base,
