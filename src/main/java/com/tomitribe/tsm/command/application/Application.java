@@ -13,6 +13,7 @@ import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
 import com.tomitribe.crest.provisioning.ssh.Ssh;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
+import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.Nexus;
 import com.tomitribe.tsm.configuration.SshKey;
@@ -32,9 +33,12 @@ import org.tomitribe.util.IO;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
@@ -331,9 +335,9 @@ public class Application {
 
                     final String envrt =
                         "export JAVA_HOME=\"" + fixedBase + "java/jdk-" + jdkVersion + "\"\n" +
-                        "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
-                        "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                        "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
+                            "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
+                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                            "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
 
                     {   // setenv needs some more love to get a proper env setup
                         final File setEnv = new File(workDir, "setenv.sh");
@@ -584,7 +588,7 @@ public class Application {
         return v;
     }
 
-    private static void validateEnvironment(final String environment, final String artifactId, final Deployments.Environment env) {
+    private static void validateEnvironment(final String environment, final String artifactId, final Deployments.Environment env) throws IOException {
         if (env == null) {
             throw new IllegalArgumentException("No environment " + environment + " for '" + artifactId + "' application");
         }
@@ -602,13 +606,34 @@ public class Application {
         if (env.getProperties() == null) {
             env.setProperties(new HashMap<>());
         }
-        final Map<String, Map<String, ?>> defaults = new MapperBuilder().setAccessModeName("field").build()
-            .readObject(Thread.currentThread().getContextClassLoader().getResourceAsStream("environment-defaults.json"), new JohnzonParameterizedType(Map.class, String.class, Object.class));
+
+        final Map<String, Map<String, ?>> defaults;
+        try (final InputStream stream = findEnvConfig()) {
+            defaults = new MapperBuilder().setAccessModeName("field").setSupportsComments(true).build()
+                .readObject(
+                    stream,
+                    new JohnzonParameterizedType(Map.class, String.class, Object.class));
+        }
         ofNullable(defaults.get(environment)).ifPresent(def -> def.forEach((k, v) -> env.getProperties().putIfAbsent(k, v.toString())));
         env.getProperties().putIfAbsent("base", env.getBase());
         env.getProperties().putIfAbsent("user", env.getUser());
         env.getProperties().putIfAbsent("artifact", artifactId);
         env.getProperties().putIfAbsent("environment", environment);
+    }
+
+    private static InputStream findEnvConfig() {
+        return ofNullable(Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(GlobalConfiguration.class))
+            .map(c -> c.read("environment.defaults.configuration.file"))
+            .map(File::new)
+            .filter(File::isFile)
+            .map(f -> {
+                try {
+                    return InputStream.class.cast(new FileInputStream(f));
+                } catch (final FileNotFoundException e) {
+                    throw new IllegalStateException(e);
+                }
+            })
+            .orElseGet(() -> Thread.currentThread().getContextClassLoader().getResourceAsStream("environment-defaults.json"));
     }
 
     private static File gitClone(final GitConfiguration git, final String base,
