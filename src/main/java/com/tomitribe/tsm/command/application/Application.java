@@ -200,12 +200,13 @@ public class Application {
                                          final String artifactId, // ie application in git
                                          @Option("node-index") @Default("-1") final int nodeIndex,
                                          @Option("as-service") final boolean asService,
+                                         @Option("restart") @Default("false") final boolean restart,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, out, err);
+            nodeIndex, asService, restart, out, err);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -221,6 +222,7 @@ public class Application {
                                final String groupId, final String inArtifactId, final String version,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
+                               @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
         final String appWorkName = groupId + '_' + inArtifactId;
@@ -460,7 +462,12 @@ public class Application {
                             .exec("sudo chkconfig --add " + artifactId);
                     }
 
-                    out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
+                    if (!restart) {
+                        out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
+                    } else {
+                        out.println("Restarting " + targetFolder + " for host " + host);
+                        ssh.exec("\"" + targetFolder + "bin/startup\"");
+                    }
 
                     git.reset(deploymentConfig.getParentFile().getParentFile());
                     // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
