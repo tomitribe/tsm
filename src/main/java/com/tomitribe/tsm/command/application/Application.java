@@ -200,12 +200,13 @@ public class Application {
                                          final String artifactId, // ie application in git
                                          @Option("node-index") @Default("-1") final int nodeIndex,
                                          @Option("as-service") final boolean asService,
+                                         @Option("restart") @Default("false") final boolean restart,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, out, err);
+            nodeIndex, asService, restart, out, err);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -221,6 +222,7 @@ public class Application {
                                final String groupId, final String inArtifactId, final String version,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
+                               @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
         final String appWorkName = groupId + '_' + inArtifactId;
@@ -381,29 +383,29 @@ public class Application {
                             "source \"$proc_script_base/bin/setenv.sh\"\n";
                     addScript(
                         out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
-                        scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
+                        scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n", app, env);
                     addScript(
                         out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
                         scriptTop +
                             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
                             "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
                             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
-                            "\n");
+                            "\n", app, env);
                     addScript(
                         out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
                         scriptTop +
                             "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
                             "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
                             "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
-                            "\n");
+                            "\n", app, env);
                     addScript(
                         out, ssh, foldersToSyncs, workDir, targetFolder, "run",
                         scriptTop +
                             "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                            "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
+                            "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n", app, env); // no post_startup since run is blocking
                     addScript(
                         out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
-                        scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
+                        scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n", app, env);
 
                     {   // just to be able to know what we did and when when browsing manually the installation, we could add much more if needed
                         final File metadata = new File(workDir, "tsm-metadata.json"); // sample usage in com.sbux.pos.basket.configuration.aspconfig.TsmPropertiesProvider
@@ -460,7 +462,12 @@ public class Application {
                             .exec("sudo chkconfig --add " + artifactId);
                     }
 
-                    out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
+                    if (!restart) {
+                        out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
+                    } else {
+                        out.println("Restarting " + targetFolder + " for host " + host);
+                        ssh.exec("\"" + targetFolder + "bin/startup\"");
+                    }
 
                     git.reset(deploymentConfig.getParentFile().getParentFile());
                     // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
@@ -475,7 +482,8 @@ public class Application {
     }
 
     private static void addScript(final PrintStream out, final Ssh ssh, final Collection<File> foldersToSync, final File workDir,
-                                  final String targetFolder, final String name, final String content) {
+                                  final String targetFolder, final String name, final String content,
+                                  final Deployments.Application application, final Deployments.Environment environment) {
         if (!foldersToSync.stream().map(f -> new File(f, "bin/" + name)).filter(File::isFile).findAny().isPresent()) {
             final File script = new File(workDir, name);
             if (!script.isFile()) {
@@ -484,6 +492,9 @@ public class Application {
                 } catch (final IOException e) {
                     throw new IllegalStateException(e);
                 }
+            }
+            if (isFilterable(script)) {
+                filterAndRewrite(script, application, environment);
             }
             ssh.scp(script, targetFolder + "bin/" + script.getName(), new ProgressBar(out, "Uploading script " + script.getName()));
         }
