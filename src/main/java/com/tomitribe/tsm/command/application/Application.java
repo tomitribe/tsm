@@ -434,10 +434,10 @@ public class Application {
 
                     // finally make scripts executable if they were not
                     final List<String> scripts = new ArrayList<>(asList("processes", "startup", "shutdown", "run", "restart"));
-                    scripts.addAll(configFolders.stream().map(f -> new File(new File(workDir, f), "bin"))
-                            .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
-                            .map(File::getName)
-                            .collect(toList()));
+                    scripts.addAll(configFolders.stream().map(f -> new File(workDir, f + "/bin"))
+                        .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
+                        .map(File::getName)
+                        .collect(toList()));
                     ssh.exec("chmod ug+rwx " + scripts.stream()
                         .map(n -> "\"" + targetFolder + "bin/" + n + "\"").collect(joining(" ")));
 
