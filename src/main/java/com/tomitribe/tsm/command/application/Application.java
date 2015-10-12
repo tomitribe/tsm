@@ -493,9 +493,6 @@ public class Application {
                     throw new IllegalStateException(e);
                 }
             }
-            if (isFilterable(script)) {
-                filterAndRewrite(script, application, environment);
-            }
             ssh.scp(script, targetFolder + "bin/" + script.getName(), new ProgressBar(out, "Uploading script " + script.getName()));
         }
     }
@@ -540,10 +537,9 @@ public class Application {
     }
 
     private static boolean isFilterable(final File file) {
-        final List<String> scripts = new ArrayList<>(asList("processes", "startup", "shutdown", "run", "restart"));
         final String name = file.getName();
         return name.endsWith(".properties") || name.endsWith(".xml") || name.endsWith(".yaml") || name.endsWith(".yml") || name.endsWith(".json")
-            || name.endsWith(".sh") || name.endsWith(".config") || scripts.contains(name);
+            || name.endsWith(".sh") || name.endsWith(".config");
     }
 
     private static String readVersion(final PrintStream out, final PrintStream err,
