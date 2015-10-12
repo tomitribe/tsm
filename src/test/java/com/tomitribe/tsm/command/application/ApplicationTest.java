@@ -169,7 +169,7 @@ public class ApplicationTest {
             new PrintStream(out), new PrintStream(err));
 
         assertEquals(asList(
-            "[ -f \"/art/prod/bin/shutdown\" ] && \"./art/prod/bin/shutdown\" 1200 -force",
+            "[ -f \"/art/prod/bin/shutdown\" ] && \"/art/prod/bin/shutdown\" 1200 -force",
             "rm -Rf \"/art/prod/\"",
             "mkdir -p \"/art/prod/\"",
             "cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done",

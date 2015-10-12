@@ -296,7 +296,7 @@ public class Application {
 
                     ssh
                         // shutdown if running
-                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"." + serverShutdownCmd + "\" 1200 -force")
+                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force")
                             // recreate the base folder if needed
                         .exec(String.format("rm -Rf \"%s\"", targetFolder))
                         .exec(String.format("mkdir -p \"%s\"", targetFolder))
