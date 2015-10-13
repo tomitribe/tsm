@@ -1,0 +1,38 @@
+= Scripting
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+== UNIx scripts
+
+=== Install TSM
+
+If you missed hit our homepage explains how to install on UNIx TSM:
+
+[source]
+----
+$ mkdir -p /opt/tsm <1>
+$ unzip /path/to/downloads/tsm-LAST-distribution.zip -d /opt/tsm <2>
+$ export PATH=/opt/tsm/tsm-LAST-distribution/bin:$PATH <3>
+----
+
+<1> we will install tsm in `/opt/tsm`
+<2> we unzip the downloaded tsm zip in `/opt/tsm`
+<3> we add the bin directory of the unpacked folder to the `PATH` to be able to call tsm simply with `tsm` command.
+
+=== Scripts
+
+Now TSM is install we can use `/usr/bin/env` to find our tsm installation and used
+accordingly with `-f` option we can execute a script:
+
+[source,sh]
+----
+#! /usr/bin/env tsm -f
+
+application install com.company.team myapplication 0.1 --environment=prod
+----
+
+This script will install version 0.1 in production of the application `myapplication`.
+

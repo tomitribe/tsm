@@ -1,0 +1,96 @@
+= Use Cases
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+== Update a port
+
+Starting from the git structure:
+
+[source]
+----
+.
+└── hello
+    ├── deployments.json
+    ├── tribestream
+    │   └── conf
+    │       ├── logging.properties
+    │       ├── server.xml
+    │       ├── ssl.jks
+    │       └── system.properties
+    ├── tribestream-dev
+    │   └── conf
+    │       └── ssl.jks
+    └── tribestream-prod
+        └── conf
+            └── ssl.jks
+----
+
+We want to update the port of dev environment to `1234`.
+
+There are several ways to do so but the easiest is to create a `server.xml` with this port in `tribestream-dev/conf`:
+
+[source]
+----
+.
+└── hello
+    ├── deployments.json
+    ├── tribestream
+    │   └── conf
+    │       ├── logging.properties
+    │       ├── server.xml
+    │       ├── ssl.jks
+    │       └── system.properties
+    ├── tribestream-dev
+    │   └── conf
+    │       ├── ssl.jks
+    │       └── server.xml <1>
+    └── tribestream-prod
+        └── conf
+            └── ssl.jks
+----
+
+<1> we add `server.xml` for the `dev` environment
+
+Now we have a dedicated `server.xml` for `dev` environment we can customize it and set our port to `1234`:
+
+[source,xml]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<Server port="${tsm.shutdown}" shutdown="SHUTDOWN">
+  <Listener className="org.apache.tomee.catalina.ServerListener"/>
+
+  <Service name="Catalina">
+    <Connector port="1234" protocol="HTTP/1.1"/> <1>
+    <Engine name="Catalina" defaultHost="localhost">
+      <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="true">
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+               prefix="access." suffix=".log"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+      </Host>
+    </Engine>
+  </Service>
+</Server>
+----
+
+<1> simply set the port on the connection as usual.
+
+Now we updated our configuration we commit and push to our git repository:
+
+[source]
+----
+/path/to/git/repo$ git commit -m "updating dev port for application hello"
+/path/to/git/repo$ git push
+----
+
+Once our configuration is stored on our remote git repository we can redeploy our application as usual:
+
+[source]
+----
+application install \
+ com.company.team myApplication 0.5 \
+ --tribestream-version=0.71 --java-version=8u60 \
+ --restart
+----

@@ -1,0 +1,169 @@
+= Commands
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+== Java standard commands pipeline
+
+For Tomcat/TomEE/Tribestream applications you generally need the following steps to setup your application:
+
+1. Install java
+2. (optional but recommanded) Install Java Cryptography Extension
+3. Install Tribestream
+4. Install your application
+
+TSM providers commands for all these steps.
+
+== Lanching TSM
+
+TSM works in any shell or in interactive mode. To launch it in interactive mode just use:
+
+[source]
+----
+tsm -i
+----
+
+The only difference between interactive mode and non-interactive mode is all commands will be prefixed
+by `tsm` in non-interactive mode.
+
+For instance:
+
+[source]
+----
+# non interactive mode
+tsm help
+
+# interactive mode
+help
+----
+
+NOTE: next snippets use interactive mode command style only.
+
+== Java8
+
+`java8` subcommands allow to install the JDK 8 and optionally its cryptography extension:
+
+[source]
+----
+java8 install myApplication 8u60 --environment=prod
+java8 cryptography-extension myApplication 8u60 --environment=prod
+----
+
+These subcommands (`install` and `cryptography-extension`) takes as parameters the application name (folder in git repository)
+and the java desired version. Then it downloads the JDK (respectively the cryptography extension) and install it on the machines
+associated to the application environment.
+
+TIP: if the JDK is deployed in the cache folder (default to maven repository: `~/.m2/repository`) it is not downloaded and the local
+file is used otherwise it is downlaoded from Oracle website.
+
+If you don't know which java versions are available you can use the command `versions`:
+
+[source]
+----
+tsm @ 0.2$ java8 versions
+JVM:
+- 8u60
+- 8u51
+- 8u5
+- 8u45
+- 8u40
+- 8u31
+- 8u25
+- 8u20
+- 8u11
+- 8
+----
+
+TIP: the installation relies on applications but if you share the same machine for several environments or if some applications
+share the same machine you don't need to install java multiple time. Binaries are shared.
+
+== Tribestream
+
+
+Tribestream commads are very close to `java8` ones but it uses Tomitribe website instead of Oracle one:
+
+[source]
+----
+tsm @ 0.2$ tribestream install myApplication 0.71 --environment=prod
+tsm @ 0.2$ tribestream versions
+Tribestream:
+- 0.73
+- 0.72.2
+- 0.72.1
+- 0.72
+- 0.71
+- 0.70
+- 0.69
+- 0.68
+- 0.67
+- 0.66
+- 0.65.1
+- 0.65
+- 0.64
+- 0.63.5
+- 0.62.1
+- 0.61.2
+- 0.60
+- 0.57.2
+----
+
+TIP: if you use Tribestream Access Gateway (TAG) and not Tribestream you can replace `tribestream` in all previous commands by `tag`.
+
+== Application
+
+`application` subcommands allow to reinstall your application. The process is pretty simple:
+
+1. git configuration is checked-out
+2. application is downloaded on the configured maven repository
+3. libraries and other web applications (if specified) are downloaded on the specified maven repository
+4. binaries and the configuration is pushed to the machine in the deployment directory /my/base/myApplication/myEnvironment
+
+IMPORTANT: before each redeployment the deployment directory is deleted, if you have persistent data ensure they are not in the deployment directory.
+
+[source]
+----
+application install \
+ com.company.team myApplication 0.5 \ <1>
+ --tribestream-version=0.71 --java-version=8u60 <2>
+----
+
+<1> the maven coordinates (groupId artifactId version) of your war.
+<2> optional the target runtimes, if not specified you will get prompted by server to select between the installed versions.
+
+PRO TIP: you can also specify the git branch to use on the command line using `--git.branch=myBranch`. It is recommanded to have
+branches for fast rollbacks if needed but it is not mandatory.
+
+=== Deployment by instance
+
+`application` commands also supports the option `--node-index=5`. This specify the index to deploy on
+using as reference the `hosts` list in `deployments.json`. Index starts at 0.
+
+With such an option you can deploy with no down time if you are behind a load balancer.
+
+=== Auto-restart after deployment
+
+`application install` command supports `--restart` option allowing to:
+
+1. shutdown the instance
+2. deploy
+3. restart the instance
+
+in a single command.
+
+=== Start/Stop commands
+
+If you want to start or stop an application (or some instances using `--node-index`) you can use
+`start` and `stop` commands:
+
+[source]
+----
+application start myApplication --environment=prod
+application stop myApplication --environment=prod
+----
+
+
+TSM also supports scripting if you want to store in a file commands to setup a complete environment, an application or even a single instance.
+To learn how to do so you can consult out link:scripting.html[Scripting] page.
+

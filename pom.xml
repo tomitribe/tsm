@@ -20,144 +20,19 @@
   </parent>
 
   <groupId>com.tomitribe.tsm</groupId>
-  <artifactId>tsm</artifactId>
+  <artifactId>tsm-parent</artifactId>
   <version>0.2-SNAPSHOT</version>
-  <name>Tribestream Server Management tool</name>
+  <packaging>pom</packaging>
+  <name>TSM</name>
+  <description>Tribestream Server Management tool</description>
 
-  <properties>
-    <jgit.version>4.0.1.201506240215-r</jgit.version>
-    <crest.version>0.7</crest.version>
-  </properties>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <version>1.16.6</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.tomitribe</groupId>
-      <artifactId>tomitribe-util</artifactId>
-      <version>1.2.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.tomitribe</groupId>
-      <artifactId>tomitribe-crest-cli</artifactId>
-      <version>${crest.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.xbean</groupId>
-          <artifactId>xbean-asm5-shaded</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.xbean</groupId>
-          <artifactId>xbean-finder-shaded</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.bval</groupId>
-          <artifactId>bval-jsr303</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-validation_1.0_spec</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <artifactId>crest-provisioning-all</artifactId>
-      <groupId>com.tomitribe.crest</groupId>
-      <version>0.0.2</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-      <version>3.4</version>
-    </dependency>
-    <dependency>
-      <groupId>org.jsoup</groupId>
-      <artifactId>jsoup</artifactId>
-      <version>1.8.3</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit</artifactId>
-      <version>${jgit.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.geronimo.specs</groupId>
-      <artifactId>geronimo-json_1.0_spec</artifactId>
-      <version>1.0-alpha-1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.johnzon</groupId>
-      <artifactId>johnzon-mapper</artifactId>
-      <version>0.9.1-incubating</version>
-    </dependency>
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.12</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.sshd</groupId>
-      <artifactId>sshd-core</artifactId>
-      <version>0.12.0</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
+  <modules>
+    <module>tsm</module>
+    <module>documentation</module>
+  </modules>
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.tomitribe</groupId>
-        <artifactId>crest-maven-plugin</artifactId>
-        <version>${crest.version}</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>descriptor</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.4</version>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <createDependencyReducedPom>false</createDependencyReducedPom>
-              <shadedClassifierName>bundle</shadedClassifierName>
-              <shadedArtifactAttached>true</shadedArtifactAttached>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>com.tomitribe.tsm.Tsm</mainClass>
-                </transformer>
-              </transformers>
-              <filters>
-                <filter>
-                  <artifact>*:*</artifact>
-                  <excludes>
-                    <exclude>META-INF/*.SF</exclude>
-                    <exclude>META-INF/*.DSA</exclude>
-                    <exclude>META-INF/*.RSA</exclude>
-                  </excludes>
-                </filter>
-              </filters>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -179,25 +54,6 @@
         <groupId>external.atlassian.jgitflow</groupId>
         <artifactId>jgitflow-maven-plugin</artifactId>
         <version>1.0-m5.1</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.5.5</version>
-        <executions>
-          <execution>
-            <id>distribution</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-            <configuration>
-              <descriptors>
-                <descriptor>src/main/assembly/dist.xml</descriptor>
-              </descriptors>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
