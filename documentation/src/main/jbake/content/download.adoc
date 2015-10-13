@@ -7,4 +7,5 @@ Romain Manni-Bucau
 
 == Available binaries
 
-- link:binaries/tsm-0.2-SNAPSHOT-distribution.zip[TSM 0.2-SNAPSHOT]
+- link:binaries/tsm-${project.version}-distribution.zip[TSM ${project.version} (zip)]
+- link:binaries/tsm-${project.version}-distribution.tar.gz[TSM ${project.version} (tar.gz)]
