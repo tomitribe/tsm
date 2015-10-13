@@ -5,4 +5,6 @@ Romain Manni-Bucau
 :jbake-status: published
 
 
-TBD
+== Available binaries
+
+- link:binaries/tsm-0.2-SNAPSHOT-distribution.zip[TSM 0.2-SNAPSHOT]
