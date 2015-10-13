@@ -19,7 +19,7 @@
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>documentation</artifactId>
+  <artifactId>tsm-documentation</artifactId>
   <name>TSM :: Documentation</name>
   <packaging>war</packaging>
 
