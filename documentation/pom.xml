@@ -51,6 +51,16 @@
                 <resource>
                   <directory>src/main/jbake</directory>
                   <filtering>true</filtering>
+                  <includes>
+                    <include>**/*.adoc</include>
+                  </includes>
+                </resource>
+                <resource>
+                  <directory>src/main/jbake</directory>
+                  <filtering>false</filtering>
+                  <excludes>
+                    <exclude>**/*.adoc</exclude>
+                  </excludes>
                 </resource>
               </resources>
             </configuration>
