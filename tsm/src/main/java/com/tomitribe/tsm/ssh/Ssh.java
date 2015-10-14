@@ -28,7 +28,7 @@ import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 
 public final class Ssh implements AutoCloseable {
-    private static final int SSH_TIMEOUT = Integer.getInteger("tsm.ssh.timeout", 120);
+    private static final int SSH_TIMEOUT = Integer.getInteger("tsm.ssh.timeout", 120000);
 
     private final Session session;
 
