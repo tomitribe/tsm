@@ -14,11 +14,11 @@ import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
+import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
 import com.tomitribe.tsm.file.TempDir;
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.http.Http;
-import com.tomitribe.crest.provisioning.ssh.Ssh;
+import com.tomitribe.tsm.http.Http;
+import com.tomitribe.tsm.ssh.Ssh;
 import lombok.NoArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -109,7 +109,7 @@ public class Java8 {
 
                 try (final Ssh ssh = new Ssh(
                     // recreate a ssh key using global config
-                    new com.tomitribe.crest.provisioning.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
                     Substitutors.resolveWithVariables(
                         ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
                         env.getProperties(),
@@ -233,7 +233,7 @@ public class Java8 {
 
                 try (final Ssh ssh = new Ssh(
                     // recreate a ssh key using global config
-                    new com.tomitribe.crest.provisioning.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
                     Substitutors.resolveWithVariables(
                         ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
                         env.getProperties(),

@@ -32,6 +32,8 @@ public interface Deployments {
         private Collection<String> webapps;
         private String base;
         private String user;
+        private String groupId;
+        private String version;
 
         public Environment findEnvironment(final String environment) {
             final Environment reduce = ofNullable(environments).orElse(emptyList()).stream()
@@ -62,6 +64,14 @@ public interface Deployments {
                     env.setWebapps(webapps);
                 }
 
+                // coordinates
+                if (env.getGroupId() == null) {
+                    env.setGroupId(groupId);
+                }
+                if (env.getVersion() == null) {
+                    env.setVersion(version);
+                }
+
                 // avoid NPE
                 if (env.getDeployerProperties() == null) {
                     env.setDeployerProperties(new HashMap<>());
@@ -88,6 +98,8 @@ public interface Deployments {
         private Collection<String> hosts;
         private String base;
         private String user;
+        private String groupId;
+        private String version;
         private Map<String, String> deployerProperties;
 
         public void validate() {

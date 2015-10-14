@@ -9,8 +9,6 @@
  */
 package com.tomitribe.tsm.command.application;
 
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.ssh.Ssh;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
@@ -18,8 +16,10 @@ import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.Nexus;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
+import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
 import com.tomitribe.tsm.file.TempDir;
+import com.tomitribe.tsm.ssh.Ssh;
 import lombok.NoArgsConstructor;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
@@ -213,6 +213,30 @@ public class Application {
             nodeIndex, asService, restart, out, err);
     }
 
+    // same as install but without groupId/artifactId (read from deployments.json)
+    // behavior wise it is an alias for config-only
+    @Command(value = "quick-install", interceptedBy = DefaultParameters.class)
+    public static void quickInstall(final Nexus nexus, // likely our apps
+                                         @Option("lib.") final Nexus nexusLib, // likely central proxy
+                                         final GitConfiguration git,
+                                         final LocalFileRepository localFileRepository,
+                                         @Option("ssh.") final SshKey sshKey,
+                                         @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                         @Option("tribestream-version") final String tribestreamVersion,
+                                         @Option("java-version") final String javaVersion,
+                                         @Option("environment") final String environment,
+                                         final String artifactId, // ie application in git
+                                         @Option("node-index") @Default("-1") final int nodeIndex,
+                                         @Option("as-service") final boolean asService,
+                                         @Option("restart") @Default("false") final boolean restart,
+                                         @Out final PrintStream out,
+                                         @Out final PrintStream err) throws IOException {
+        install(
+            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
+            null, artifactId, null, // see install() for details
+            nodeIndex, asService, restart, out, err);
+    }
+
     @Command(interceptedBy = DefaultParameters.class)
     public static void install(final Nexus nexus, // likely our apps
                                @Option("lib.") final Nexus nexusLib, // likely central proxy
@@ -223,13 +247,13 @@ public class Application {
                                @Option("tribestream-version") final String tribestreamVersion,
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String environment,
-                               final String groupId, final String inArtifactId, final String version,
+                               final String inGroupId, final String inArtifactId, final String inVersion,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
                                @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
                                @Out final PrintStream err) throws IOException {
-        final String appWorkName = groupId + '_' + inArtifactId;
+        final String appWorkName = ofNullable(inGroupId).orElse("-") + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
         final File deploymentConfig = gitClone(git, inArtifactId, out, workDir);
@@ -241,6 +265,9 @@ public class Application {
 
             final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
             final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+
+            final String groupId = ofNullable(inGroupId).orElse(env.getGroupId());
+            final String version = ofNullable(inVersion).orElse(env.getVersion());
 
             final File downloadedFile;
             if (groupId == null && version == null) {
@@ -652,7 +679,7 @@ public class Application {
     private static Ssh newSsh(final SshKey sshKey, final String host, final Deployments.Application app, final Deployments.Environment env) {
         return new Ssh(
             // recreate a ssh key using global config
-            new com.tomitribe.crest.provisioning.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+            new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
             Substitutors.resolveWithVariables(
                 ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
                 env.getProperties(),

@@ -64,11 +64,6 @@
       </exclusions>
     </dependency>
     <dependency>
-      <artifactId>crest-provisioning-all</artifactId>
-      <groupId>com.tomitribe.crest</groupId>
-      <version>0.0.2</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
       <version>3.4</version>
@@ -92,6 +87,11 @@
       <groupId>org.apache.johnzon</groupId>
       <artifactId>johnzon-mapper</artifactId>
       <version>0.9.1-incubating</version>
+    </dependency>
+    <dependency>
+      <groupId>com.jcraft</groupId>
+      <artifactId>jsch</artifactId>
+      <version>0.1.53</version>
     </dependency>
 
     <dependency>
@@ -174,6 +174,15 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18</version>
+        <configuration>
+          <forkCount>1</forkCount>
+          <reuseFork>true</reuseFork>
+        </configuration>
       </plugin>
     </plugins>
   </build>

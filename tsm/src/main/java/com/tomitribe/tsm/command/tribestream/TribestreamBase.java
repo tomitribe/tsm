@@ -9,16 +9,16 @@
  */
 package com.tomitribe.tsm.command.tribestream;
 
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.http.Http;
-import com.tomitribe.crest.provisioning.ssh.Ssh;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
+import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.file.TempDir;
+import com.tomitribe.tsm.http.Http;
+import com.tomitribe.tsm.ssh.Ssh;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
 import org.tomitribe.util.IO;
@@ -142,7 +142,7 @@ class TribestreamBase {
 
                 try (final Ssh ssh = new Ssh(
                     // recreate a ssh key using global config
-                    new com.tomitribe.crest.provisioning.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
+                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
                         ofNullable(sshKey.getPassphrase())
                             .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
                                 .map(s -> new String(Base64.getDecoder().decode(s)))

@@ -9,8 +9,8 @@
  */
 package com.tomitribe.tsm.configuration;
 
-import com.tomitribe.crest.provisioning.gui.console.ProgressBar;
-import com.tomitribe.crest.provisioning.http.Http;
+import com.tomitribe.tsm.console.ProgressBar;
+import com.tomitribe.tsm.http.Http;
 import lombok.Data;
 import org.tomitribe.crest.api.Option;
 import org.tomitribe.crest.api.Options;

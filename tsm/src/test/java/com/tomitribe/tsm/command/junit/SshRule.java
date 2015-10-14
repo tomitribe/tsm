@@ -96,6 +96,7 @@ public class SshRule implements TestRule {
                 ssh.setPublickeyAuthenticator((username, key, session) -> "test".equals(username) && "RSA".equals(key.getAlgorithm()));
                 ssh.setCommandFactory(new ScpCommandFactory(command -> new Command() {
                     private ExitCallback callback;
+                    private OutputStream os;
 
                     @Override
                     public void setInputStream(final InputStream in) {
@@ -104,7 +105,7 @@ public class SshRule implements TestRule {
 
                     @Override
                     public void setOutputStream(final OutputStream out) {
-                        // no-op
+                        os = out;
                     }
 
                     @Override
