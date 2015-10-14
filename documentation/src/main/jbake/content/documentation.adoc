@@ -10,6 +10,7 @@ Romain Manni-Bucau
 ** link:documentation/setup.html[Setup]
 ** link:documentation/commands.html[Commands]
 ** link:documentation/scripting.html[Scripting]
+** link:documentation/deployments-schema.html[Deployments.json Schema]
 * link:documentation/use-case.html[Use Cases]
 
 [col-sm-6]

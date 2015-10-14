@@ -1,0 +1,53 @@
+= Deployments.json Schema
+Romain Manni-Bucau
+2015-10-14
+:jbake-type: page
+:jbake-status: published
+
+
+`deployments.json` is a central piece of TSM, here is an exhaustive schema:
+
+[source]
+----
+{
+    "user": "...",
+    "base": "...",
+    "groupId": "...",
+    "version": "...",
+    "name": "...",
+    "libs": ["...", "..."], <1>
+    "webapps": ["...", "..."], <1>
+    "properties": {
+        "...": "...",
+        "...": "..."
+    },
+    "byHostProperties": {
+        "...": ["...","..."]
+        "...": ["...","..."]
+    },
+    "environments":{
+        "names": ["...", "..."],
+        "user": "...",
+        "base": "...",
+        "groupId": "...",
+        "version": "...",
+        "hosts": ["...", "..."],
+        "libs": ["...", "..."], <1>
+        "webapps": ["...", "..."], <1>
+        "properties": {
+            "...": "...",
+            "...": "..."
+        },
+        "byHostProperties": {
+            "...": ["...","..."]
+            "...": ["...","..."]
+        },
+        "deployerProperties": {
+            "...": ["...","..."]
+            "...": ["...","..."]
+        }
+    }
+}
+----
+
+<1> values are maven coordinates with this format: `groupId:artifactId:version`.
