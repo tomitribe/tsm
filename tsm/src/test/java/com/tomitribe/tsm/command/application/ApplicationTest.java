@@ -52,7 +52,7 @@ public class ApplicationTest {
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-start-work/"), -1,
-            new GitConfiguration(git.directory(), "ApplicationTest-start", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new GitConfiguration(git.directory(), "ApplicationTest-start", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "start", new PrintStream(out));
 
         assertEquals(singletonList("\"/start/prod/bin/startup\""), ssh.commands());
@@ -68,7 +68,7 @@ public class ApplicationTest {
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-stop-work/"), -1,
-            new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "stop", new PrintStream(out));
 
         assertEquals(singletonList("\"/stop/prod/bin/shutdown\" 1200 -force"), ssh.commands());
@@ -84,7 +84,7 @@ public class ApplicationTest {
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-ping-work/"), -1,
-            new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "ping", new PrintStream(out));
 
         assertEquals(singletonList("GET http://127.0.0.1:8443 2>&1 | grep -v 'command not found' || curl -v http://127.0.0.1:8443"), ssh.commands());
@@ -100,7 +100,7 @@ public class ApplicationTest {
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-tg-work/"),
-            new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             new LocalFileRepository(new File("target/missing")),
             new Nexus("http://faked", null, null) {
                 @Override
@@ -161,7 +161,7 @@ public class ApplicationTest {
                     };
                 }
             },
-            new GitConfiguration(git.directory(), "ApplicationTest-install", "master", ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new GitConfiguration(git.directory(), "ApplicationTest-install", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),

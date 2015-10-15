@@ -48,6 +48,7 @@ public class GitConfiguration {
     private static final String DEFAULT_KEYS = "defaults";
     private static final String NO_PASSPHRASE = "no";
 
+    private String revision;
     private String branch;
     private String sshKey;
     private String sshPassphrase;
@@ -58,11 +59,13 @@ public class GitConfiguration {
             @Option("git.base") final String base,
             @Option("git.repository") final String repo,
             @Option("git.branch") @Default("master") final String branch,
+            @Option("git.revision") final String revision,
             @Option("git.sshKey") final String sshKey,
             @Option("git.sshPassphrase") final String sshPassphrase) {
         this.base = base;
         this.repository = repo;
         this.branch = branch;
+        this.revision = revision;
         this.sshKey = ofNullable(sshKey).map(Substitutors::resolveWithVariables).orElse(null);
         this.sshPassphrase = Substitutors.resolveWithVariables(sshPassphrase);
     }
@@ -123,7 +126,11 @@ public class GitConfiguration {
                     }
                 });
             }
-            cloneCommand.call();
+
+            final Git git = cloneCommand.call();
+            if (revision != null) {
+                git.checkout().setCreateBranch(true).setName("deployment-" + revision).setStartPoint(revision).call();
+            }
         } catch (final GitAPIException e) {
             throw new IllegalStateException(e);
         }
