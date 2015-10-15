@@ -1,0 +1,25 @@
+= Concept
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+TSM is designed as a remote deployer. The intention is to automate the deployment process of an application
+on a UNIx server.
+
+Here is the overall architecture of TSM:
+
+image::../images/architecture.png[TSM Concept,align="center"]
+
+TSM configuration is read from Git (can be github or any git repository),
+from this configuration TSM knows which servers are targetted by the deployer
+just referencing on the command line the application and the environment.
+
+Then if TSM needs any binaries it goes on a maven repository(ies) (Nexus most of the time but any Maven repository
+hosting maven metadata works) to get the binaries (server, application, ...).
+
+Finally once TSM got all binaries it deploys the configuration hosted in git for the application
+and the downloaded binaries.
+
+To create your first TSM repository you can go on the link:setup.html[Setup] documentation.

@@ -1,0 +1,278 @@
+= Setup
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+== First step
+
+As seen in link:concept.html[Concept] page TSM relies on a git repository and SSH
+to connect to servers. If you want to be able to deploy Tribestream as well you will
+need to setup a Tomitribe account.
+
+Since all this configuration is common to most of applications you can save it in a
+file reused by all commands and avoid to fill all these parameters for all commands.
+
+By default TSM uses `~/.tsmrc` but it provides `configuration reload` commands to load another
+configuration file if you use the interactive mode.
+
+=== Configure git client in ~/.tsmrc
+
+TSM git connection is done through SSH connection which is compatible with most of git servers
+(typically github).
+
+The typical configuration for git looks like:
+
+[source,properties]
+----
+git.repository: myOrganisation/myTsmRepository <1>
+git.base: git@github.com <2>
+git.sshKey: /path/to/myGitSshKey.pem <3>
+git.sshPassphrase: base64:myPassWordInBase64 <4>
+----
+
+<1> which repository to use to find TSM configuration.
+<2> which git base do you use, if you use github it is `git@github.com` for the public instance and `git@github.company.com` for enterprise instances.
+<3> the ssh key you use to close the TSM git repository.
+<4> the passphrase used with the ssh key if any. You can encode it in base64 prefixing the base64 encoded value by `base64:` if you want.
+
+
+NOTE: the password only uses Base64 encoding but keep in mind you deploy from your account/machine so
+you don't need a highly secure storage normally (if you use ubuntu, account home encryption is enough for instance).
+
+
+=== Configure SSH connection
+
+To connect to machine through SSH you can also setup the SSH key you use and its passphrase:
+
+[source,properties]
+----
+ssh.path: /path/to/myGitSshKey.pem <1>
+ssh.passphrase: base64:myPassWordInBase64 <2>
+----
+
+<1> as for `git.sshKey` just specify the path to the ssh key you use to connect on the servers (it can be the same as git one or not).
+<2> the passphrase in clear or base64 allowing to use the SSH key specified in 1.
+
+=== Integrate with Tribestream and Tomitribe Download Area
+
+If you want to use TSM to deploy Tomitribe Tribestream and be able to list available versions you need a Tomitribe account.
+
+To get an account just go on http://www.tomitribe.com/downloads/[Tomitribe Download Area] and create an account
+clicking on Register button:
+
+image::../images/tomitribe-register.png[Tomitribe Register,align="center"]
+
+Then once you submitted the registration form and you can click on Login and access the download area you can configure TSM to use your account
+to get Tribestream integration.
+
+To do so you just need to fill your username and password in `~/.tsmrc`:
+
+[source,properties]
+----
+www.tomitribe.com.username: myusername <1>
+www.tomitribe.com.password: base64:myPasswordBase64 <2>
+----
+
+<1> the username you selected for the download area.
+<2> the associated password.
+
+=== Environments and defaults
+
+==== Ports
+
+This part is optional but TSM links deployment to an environment. Sometimes this notion is called a "Stage".
+Idea is to be able to deploy easily and almost identically the same application to different environments.
+
+For TSM an environment is by convention a folder but it can be linked to ports for the server, TSM providing some placeholders
+for HTTP, HTTPS and SHUTDOWN ports automatically allowing you to keep your configuration simple (it will be detailled in another part).
+
+Out of the box TSM only knows `prod` environment and associate it the following ports:
+
+[cols="2*", options="header",frame="all"]
+[.table.table-bordered]
+|====
+| Name     | Value
+| HTTP     | 8080
+| HTTPS    | 8443
+| SHUTDOWN | 8005
+|====
+
+If you want to customize the port or add the support for more environments you can specify a `environment.defaults.configuration.file`
+entry in your `~/.tsmrc` pointing to a JSON file listing all supported environments:
+
+[source,javascript]
+----
+{
+  "dev":{
+    "tsm.http": 6080,
+    "tsm.https": 6443,
+    "tsm.shutdown": 6005,
+    "tsm.portMarker": 6,
+    "tsm.environment": "pi"
+  },
+  "staging":{
+    "tsm.http": 7080,
+    "tsm.https": 7443,
+    "tsm.shutdown": 7005,
+    "tsm.portMarker": 7,
+    "tsm.environment": "pd"
+  },
+  "prod":{
+    "tsm.http": 8080,
+    "tsm.https": 8443,
+    "tsm.shutdown": 8005,
+    "tsm.portMarker": 8,
+    "tsm.environment": "prod"
+  }
+}
+----
+
+All these variables are added to the selected environment as usable placeholders in your filtered configuration files.
+You don't need to respect `tsm.x` naming but it is what is used by the implicit configuration file.
+
+==== Default environment
+
+If you have a single environment or if you want to be sure to avoid to deploy in production inintentionally
+you can set an `environment` in your `~/.tsmrc`:
+
+[source,properties]
+----
+environment: dev <1>
+----
+
+<1> ensures you deploy in `dev` environment if you don't specify the environment in the command you execute.
+
+== Create your first TSM git repository
+
+Once you create a git repository on your platform clone it locally and create a folder for your application
+named as the `artifactId` of your application (hello for this example) and a `deployments.json` file inside:
+
+[source]
+----
+.
+└── hello
+    └── deployments.json
+----
+
+=== Deployments.json
+
+`deployments.json` is the file describing the basic setup for your application:
+
+[source,javascript]
+----
+{
+  "user": "myUser", <1>
+  "base": "/opt/applications/", <2>
+  "environments": [
+    {
+      "names": [ "prod" ], <3>
+      "hosts": [ "host1", "host2" ], <4>
+      "properties": { <5>
+        "someKey": "someValue"
+      }
+    }
+  ]
+}
+----
+
+<1> the SSH user to use to connect to the machines.
+<2> where to install the application.
+<3> the list of environment names matching this configuration.
+<4> the host to use for this (these) environment(s).
+<5> some key value pairs you can reuse as placeholders in your application configuration.
+
+=== Configuration
+
+For Tomcat/TomEE/Tribestream deployment you often need to specify some configuration files.
+
+For such deployment you can some folders hosting the templates to deploy. All environments will inherit from
+`tribestream` folder and you can consider this folder as `tomcat.base` one (ie you can add inside a conf/, a bin/... folder).
+
+If all your environments don't use the same configuration and you can't use placeholders to differentiate them
+you can create a `tribestream-<environment>` with the configuration dedicated to this environment.
+
+TIP: if several environments share the same specific configuration you can add in your environment object a `deployerProperties`
+object with `tribestream.folder` overriding the suffix to use:
+
+[source,javascript]
+----
+{
+  "user": "myUser",
+  "base": "/opt/applications/",
+  "environments": [
+    {
+      "names": [ "staging", "prod" ],
+      "hosts": [ "host1", "host2" ],
+      "deployerProperties": {
+        "tribestream.folder": "final" <1>
+      }
+    }
+  ]
+}
+----
+
+<1> instead of using either `tribestream-staging` or `tribestream-prod` TSM will use `tribestream-final` for both environments.
+
+
+A standard Tomcat setup contains a `logging.properties`, `server.xml` and a ssl.jks if you use HTTPS.
+A TomEE or Tribestream likely often contains a `system.properties`.
+
+Supposing our Hello application needs a TomEE we will likely create a git repository with the following layout:
+
+[source]
+----
+.
+└── hello
+    ├── deployments.json <1>
+    ├── tribestream <2>
+    │   └── conf
+    │       ├── logging.properties
+    │       ├── server.xml
+    │       ├── ssl.jks
+    │       └── system.properties
+    ├── tribestream-dev <3>
+    │   └── conf
+    │       └── ssl.jks
+    └── tribestream-prod <3>
+        └── conf
+            └── ssl.jks
+----
+
+<1> the dpeloyments.json defining our to deploy to all our environments.
+<2> the shared configuration between `dev` and `prod`. It can use filtering to specify some specificity of the environment in the configuration files.
+<3> specific configuration folders. Here we use it only for the HTTPS keystore which are binary files (so not specifying through filtering).
+
+=== Default scripts and Hooks
+
+By default TSM will create for your application several built-in scripts in your application bin directory:
+
+[cols="2*", options="header",frame="all"]
+[.table.table-bordered]
+|====
+| Name          | Usage
+| processes     | list processes associated to application directory
+| setenv.sh     | the standard Tomcat setenv.sh
+| startup       | starts the application
+| shutdown      | stops the application
+|====
+
+
+If the default TSM scripts are not enough for you, TSM supports few events you can use to add scripts
+before/after startup and shutdown:
+
+[cols="2*", options="header",frame="all"]
+[.table.table-bordered]
+|====
+| Name               | Event
+| pre_startup.sh     | executed before the server starts.
+| post_startup.sh    | executed after the server start command.
+| pre_shutdown.sh    | executed before the server stops.
+| post_shutdown.sh   | executed after the server stop command.
+|====
+
+
+
+
+Now you are all setup to use TSM let's start to use it with its link:commands.html[Commands].

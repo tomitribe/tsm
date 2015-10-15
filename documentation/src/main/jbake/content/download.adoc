@@ -1,0 +1,11 @@
+= Download
+Romain Manni-Bucau
+2015-10-13
+:jbake-type: page
+:jbake-status: published
+
+
+== Available binaries
+
+- link:binaries/tsm-${project.version}-distribution.zip[TSM ${project.version} (zip)]
+- link:binaries/tsm-${project.version}-distribution.tar.gz[TSM ${project.version} (tar.gz)]

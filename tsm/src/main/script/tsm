@@ -1,0 +1,45 @@
+#! /bin/bash
+
+#
+# capture environment setup or default from this script location
+#
+TSM_HOME="${TSM_HOME:-`cd $(dirname $0) && cd .. && pwd`}"
+
+#
+# capture java path
+#
+if [ -z "$JAVA_HOME" -a -z "$JRE_HOME" ]; then
+  if $darwin; then
+    if [ -x '/usr/libexec/java_home' ] ; then
+      JAVA_HOME=`/usr/libexec/java_home`
+    elif [ -d "/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home" ]; then
+      JAVA_HOME="/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home"
+    fi
+  else
+    JAVA_PATH=`which java 2>/dev/null`
+    if [ "x$JAVA_PATH" != "x" ]; then
+      JAVA_PATH=`dirname $JAVA_PATH 2>/dev/null`
+    fi
+  fi
+  if [ -z "$JAVA_HOME" -a -z "$JRE_HOME" ]; then
+    echo "Neither the JAVA_HOME nor the JRE_HOME environment variable is defined"
+    echo "At least one of these environment variable is needed to run this program"
+    exit 1
+  fi
+fi
+JAVA_PATH="${JAVA_PATH:-$JAVA_HOME/bin/java}"
+
+#
+# build the classpath
+#
+tsm_classpath=""
+for i in $TSM_HOME/lib/*.jar; do
+    tsm_classpath="$tsm_classpath:$i"
+done
+
+#
+# run the app
+#
+echo -e "Using tsm.home=$TSM_HOME | java=$JAVA_PATH\n"
+
+"$JAVA_PATH" "-Dtsm.home=$TSM_HOME $JAVA_OPTS" -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@
