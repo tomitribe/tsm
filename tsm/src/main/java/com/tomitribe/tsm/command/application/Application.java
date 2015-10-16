@@ -51,6 +51,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -262,7 +263,9 @@ public class Application {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
+            final AtomicBoolean reInitFiltering = new AtomicBoolean();
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                final String envName = contextualEnvironment.getName();
                 final Deployments.Environment env = contextualEnvironment.getEnvironment();
                 validateEnvironment(inArtifactId, contextualEnvironment);
 
@@ -278,17 +281,19 @@ public class Application {
                     out.println("configuration only, skipping artifacts");
                 } else {
                     downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
-                    final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
-                    if (cacheFile.isFile()) {
-                        out.println("Using locally cached " + artifactId + '.');
-                        try {
-                            IO.copy(cacheFile, downloadedFile);
-                        } catch (final IOException e) {
-                            throw new IllegalStateException(e);
+                    if (!downloadedFile.isFile()) {
+                        final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
+                        if (cacheFile.isFile()) {
+                            out.println("Using locally cached " + artifactId + '.');
+                            try {
+                                IO.copy(cacheFile, downloadedFile);
+                            } catch (final IOException e) {
+                                throw new IllegalStateException(e);
+                            }
+                        } else {
+                            out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
+                            nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
                         }
-                    } else {
-                        out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
-                        nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
                     }
                 }
 
@@ -296,7 +301,9 @@ public class Application {
                 ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
                     final String[] segments = lib.split(":");
                     final File local = new File(workDir, segments[1] + ".jar");
-                    nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                    if (!local.isFile()) {
+                        nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                    }
                     additionalLibs.add(local);
                 });
 
@@ -304,7 +311,9 @@ public class Application {
                 ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
                     final String[] segments = war.split(":");
                     final File local = new File(workDir, segments[1] + ".war");
-                    nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                    if (!local.isFile()) {
+                        nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                    }
                     additionalWebapps.add(local);
                 });
 
@@ -313,6 +322,7 @@ public class Application {
                 final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
                     .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
                 final AtomicInteger currentIdx = new AtomicInteger();
+                reInitFiltering.set(true);
                 env.getHosts().forEach(host -> {
                     out.println("Deploying " + artifactId + " on " + host);
 
@@ -324,15 +334,14 @@ public class Application {
                         return;
                     } // else deploy
 
-                    try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                    final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (envName + '/'));
+                    final String serverShutdownCmd = targetFolder + "bin/shutdown";
 
+                    try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
                         final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
                         final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
-
-                        final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (contextualEnvironment.getName() + '/'));
-                        final String serverShutdownCmd = targetFolder + "bin/shutdown";
 
                         ssh
                             // shutdown if running
@@ -353,7 +362,7 @@ public class Application {
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
-                        final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, contextualEnvironment.getName()));
+                        final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, envName));
                         configFolders.forEach(folder -> {
                             final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
                             if (foldersToSync.isDirectory()) {
@@ -369,13 +378,13 @@ public class Application {
 
                         final String envrt =
                             "export JAVA_HOME=\"" + fixedBase + "java/jdk-" + jdkVersion + "\"\n" +
-                                "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
-                                "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                                "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
+                            "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
+                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                            "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
-                            if (!setEnv.isFile()) {
+                            if (reInitFiltering.get() || !setEnv.isFile()) {
                                 final Optional<File> source = foldersToSyncs.stream().map(f -> new File(f, "bin/setenv.sh")).filter(File::isFile).findFirst();
                                 final StringBuilder content = new StringBuilder();
                                 final Consumer<StringBuilder> appender = b -> {
@@ -420,9 +429,11 @@ public class Application {
                                 "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
                                 "source \"$proc_script_base/bin/setenv.sh\"\n";
                         addScript(
+                            reInitFiltering.get(),
                             out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
                             scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
                         addScript(
+                            reInitFiltering.get(),
                             out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
                             scriptTop +
                                 "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
@@ -430,6 +441,7 @@ public class Application {
                                 "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
                                 "\n");
                         addScript(
+                            reInitFiltering.get(),
                             out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
                             scriptTop +
                                 "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
@@ -437,11 +449,13 @@ public class Application {
                                 "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
                                 "\n");
                         addScript(
+                            reInitFiltering.get(),
                             out, ssh, foldersToSyncs, workDir, targetFolder, "run",
                             scriptTop +
                                 "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
                                 "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
                         addScript(
+                            reInitFiltering.get(),
                             out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
                             scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
 
@@ -451,7 +465,7 @@ public class Application {
                                 writer.write("{\n");
                                 writer.write("  \"date\":\"" + LocalDateTime.now().toString() + "\",\n");
                                 writer.write("  \"host\":\"" + host + "\",\n");
-                                writer.write("  \"environment\":\"" + contextualEnvironment.getName() + "\",\n");
+                                writer.write("  \"environment\":\"" + envName + "\",\n");
                                 writer.write("  \"application\":{\n");
                                 writer.write("    \"groupId\":\"" + ofNullable(groupId).orElse("") + "\",\n");
                                 writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
@@ -481,7 +495,7 @@ public class Application {
 
                         if (asService) { // needs write access in /etc /init.d/and sudo without password
                             final File initD = new File(workDir, "initd");
-                            if (!initD.isFile()) {
+                            if (reInitFiltering.get() || !initD.isFile()) {
                                 try (final FileWriter writer = new FileWriter(initD)) {
                                     writer.write("" +
                                         "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
@@ -508,6 +522,7 @@ public class Application {
                         }
 
                         git.reset(deploymentConfig.getParentFile().getParentFile());
+                        reInitFiltering.set(false);
                         // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
                     }
                 });
@@ -520,11 +535,12 @@ public class Application {
             .orElseGet(() -> ofNullable(environment.getDeployerProperties().get("tribestream.folder")).orElse(def));
     }
 
-    private static void addScript(final PrintStream out, final Ssh ssh, final Collection<File> foldersToSync, final File workDir,
+    private static void addScript(final boolean forceInit,
+                                  final PrintStream out, final Ssh ssh, final Collection<File> foldersToSync, final File workDir,
                                   final String targetFolder, final String name, final String content) {
         if (!foldersToSync.stream().map(f -> new File(f, "bin/" + name)).filter(File::isFile).findAny().isPresent()) {
             final File script = new File(workDir, name);
-            if (!script.isFile()) {
+            if (forceInit || !script.isFile()) {
                 try (final FileWriter writer = new FileWriter(script)) {
                     writer.write(content);
                 } catch (final IOException e) {
