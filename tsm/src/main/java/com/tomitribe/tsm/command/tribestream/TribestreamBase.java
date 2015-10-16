@@ -54,7 +54,7 @@ class TribestreamBase {
     static void install(final String displayName,
                         final String artifactId,
                         final File workDirBase,
-                        final String environment,
+                        final String inEnvironment,
                         final SshKey sshKey,
                         final TomitribeTribestreamMetadataPrincipal security,
                         final LocalFileRepository localFileRepository,
@@ -129,41 +129,39 @@ class TribestreamBase {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            if (env == null) {
-                throw new IllegalArgumentException("No environment " + environment + " for '" + application + "' application");
-            }
-            if (env.getBase() == null) {
-                throw new IllegalArgumentException("No base for environment " + environment + " for '" + application + "' application");
-            }
-
-            env.getHosts().forEach(host -> {
-                out.println("Deploying " + displayName + " " + version + " on " + host);
-
-                try (final Ssh ssh = new Ssh(
-                    // recreate a ssh key using global config
-                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
-                        ofNullable(sshKey.getPassphrase())
-                            .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
-                                .map(s -> new String(Base64.getDecoder().decode(s)))
-                                .orElse(null)))),
-                    Substitutors.resolveWithVariables(
-                        ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                        env.getProperties(),
-                        app.getProperties()
-                    ))) {
-
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                    final String remoteWorkDir = fixedBase + "work-provisioning/";
-                    final String target = remoteWorkDir + downloadedFile.getName();
-                    final String targetFolder = fixedBase + "tribestream/" + artifactId + '-' + version + '/';
-                    ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
-                        .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
-                        .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
-                        .exec(String.format("rm \"%s\"", target));
-
-                    out.println(displayName + " setup in " + targetFolder + " for host " + host);
+            app.findEnvironments(inEnvironment).forEach(env -> {
+                if (env.getEnvironment().getBase() == null) {
+                    throw new IllegalArgumentException("No base for environment " + env.getName() + " for '" + application + "' application");
                 }
+
+                env.getEnvironment().getHosts().forEach(host -> {
+                    out.println("Deploying " + displayName + " " + version + " on " + host);
+
+                    try (final Ssh ssh = new Ssh(
+                        // recreate a ssh key using global config
+                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
+                            ofNullable(sshKey.getPassphrase())
+                                .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
+                                    .map(s -> new String(Base64.getDecoder().decode(s)))
+                                    .orElse(null)))),
+                        Substitutors.resolveWithVariables(
+                            ofNullable(env.getEnvironment().getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                            env.getEnvironment().getProperties(),
+                            app.getProperties()
+                        ))) {
+
+                        final String fixedBase = env.getEnvironment().getBase() + (env.getEnvironment().getBase().endsWith("/") ? "" : "/");
+                        final String remoteWorkDir = fixedBase + "work-provisioning/";
+                        final String target = remoteWorkDir + downloadedFile.getName();
+                        final String targetFolder = fixedBase + "tribestream/" + artifactId + '-' + version + '/';
+                        ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
+                            .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
+                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
+                            .exec(String.format("rm \"%s\"", target));
+
+                        out.println(displayName + " setup in " + targetFolder + " for host " + host);
+                    }
+                });
             });
         }
     }

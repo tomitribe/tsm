@@ -128,7 +128,7 @@ public class Application {
     }
 
     @Command(value = "install-tar.gz", interceptedBy = DefaultParameters.class)
-    public static void installTarGzArtifact(@Option("environment") final String environment,
+    public static void installTarGzArtifact(@Option("environment") final String inEnvironment,
                                             @Option("ssh.") final SshKey sshKey,
                                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                             final GitConfiguration git,
@@ -151,24 +151,26 @@ public class Application {
 
         try (final FileReader reader = new FileReader(gitClone(git, artifactId, out, workDir))) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            validateEnvironment(environment, artifactId, env);
+            app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                final Deployments.Environment env = contextualEnvironment.getEnvironment();
+                validateEnvironment(artifactId, contextualEnvironment);
 
-            env.getHosts().forEach(host -> {
-                out.println("Installing " + segments[1] + " to " + host);
+                env.getHosts().forEach(host -> {
+                    out.println("Installing " + segments[1] + " to " + host);
 
-                try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                    final String remoteWorkDir = fixedBase + "work-provisioning/";
-                    final String target = remoteWorkDir + tarGz.getName();
-                    final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
-                    ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
-                        .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
-                        .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
-                        .exec(String.format("rm \"%s\"", target));
+                    try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
+                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                        final String remoteWorkDir = fixedBase + "work-provisioning/";
+                        final String target = remoteWorkDir + tarGz.getName();
+                        final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
+                        ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
+                            .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
+                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
+                            .exec(String.format("rm \"%s\"", target));
 
-                    out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
-                }
+                        out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
+                    }
+                });
             });
         }
     }
@@ -217,20 +219,20 @@ public class Application {
     // behavior wise it is an alias for config-only
     @Command(value = "quick-install", interceptedBy = DefaultParameters.class)
     public static void quickInstall(final Nexus nexus, // likely our apps
-                                         @Option("lib.") final Nexus nexusLib, // likely central proxy
-                                         final GitConfiguration git,
-                                         final LocalFileRepository localFileRepository,
-                                         @Option("ssh.") final SshKey sshKey,
-                                         @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
-                                         @Option("tribestream-version") final String tribestreamVersion,
-                                         @Option("java-version") final String javaVersion,
-                                         @Option("environment") final String environment,
-                                         final String artifactId, // ie application in git
-                                         @Option("node-index") @Default("-1") final int nodeIndex,
-                                         @Option("as-service") final boolean asService,
-                                         @Option("restart") @Default("false") final boolean restart,
-                                         @Out final PrintStream out,
-                                         @Out final PrintStream err) throws IOException {
+                                    @Option("lib.") final Nexus nexusLib, // likely central proxy
+                                    final GitConfiguration git,
+                                    final LocalFileRepository localFileRepository,
+                                    @Option("ssh.") final SshKey sshKey,
+                                    @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                    @Option("tribestream-version") final String tribestreamVersion,
+                                    @Option("java-version") final String javaVersion,
+                                    @Option("environment") final String environment,
+                                    final String artifactId, // ie application in git
+                                    @Option("node-index") @Default("-1") final int nodeIndex,
+                                    @Option("as-service") final boolean asService,
+                                    @Option("restart") @Default("false") final boolean restart,
+                                    @Out final PrintStream out,
+                                    @Out final PrintStream err) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
@@ -246,7 +248,7 @@ public class Application {
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("tribestream-version") final String tribestreamVersion,
                                @Option("java-version") final String javaVersion,
-                               @Option("environment") final String environment,
+                               @Option("environment") final String inEnvironment,
                                final String inGroupId, final String inArtifactId, final String inVersion,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("as-service") final boolean asService,
@@ -260,249 +262,255 @@ public class Application {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            validateEnvironment(environment, inArtifactId, env);
+            app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                final Deployments.Environment env = contextualEnvironment.getEnvironment();
+                validateEnvironment(inArtifactId, contextualEnvironment);
 
-            final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
-            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+                final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
+                final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
 
-            final String groupId = ofNullable(inGroupId).orElse(env.getGroupId());
-            final String version = ofNullable(inVersion).orElse(env.getVersion());
+                final String groupId = ofNullable(inGroupId).orElse(env.getGroupId());
+                final String version = ofNullable(inVersion).orElse(env.getVersion());
 
-            final File downloadedFile;
-            if (groupId == null && version == null) {
-                downloadedFile = null;
-                out.println("configuration only, skipping artifacts");
-            } else {
-                downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
-                final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
-                if (cacheFile.isFile()) {
-                    out.println("Using locally cached " + artifactId + '.');
-                    IO.copy(cacheFile, downloadedFile);
+                final File downloadedFile;
+                if (groupId == null && version == null) {
+                    downloadedFile = null;
+                    out.println("configuration only, skipping artifacts");
                 } else {
-                    out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
-                    nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
-                }
-            }
-
-            final Collection<File> additionalLibs = new LinkedList<>();
-            ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
-                final String[] segments = lib.split(":");
-                final File local = new File(workDir, segments[1] + ".jar");
-                nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-                additionalLibs.add(local);
-            });
-
-            final Collection<File> additionalWebapps = new LinkedList<>();
-            ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
-                final String[] segments = war.split(":");
-                final File local = new File(workDir, segments[1] + ".war");
-                nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
-                additionalWebapps.add(local);
-            });
-
-            final AtomicReference<String> chosenTribestreamVersion = new AtomicReference<>(tribestreamVersion);
-            final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
-            final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
-                .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
-            final AtomicInteger currentIdx = new AtomicInteger();
-            env.getHosts().forEach(host -> {
-                out.println("Deploying " + artifactId + " on " + host);
-
-                // override by host variables
-                byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
-                env.getProperties().putIfAbsent("host", host);
-
-                if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
-                    return;
-                } // else deploy
-
-                try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-
-                    // get tribestream version or just ask the user for it listing the ones the server has
-                    final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
-                    final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
-
-                    final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (environment + '/'));
-                    final String serverShutdownCmd = targetFolder + "bin/shutdown";
-
-                    ssh
-                        // shutdown if running
-                        .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force")
-                            // recreate the base folder if needed
-                        .exec(String.format("rm -Rf \"%s\"", targetFolder))
-                        .exec(String.format("mkdir -p \"%s\"", targetFolder))
-                            // create app structure
-                        .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done");
-
-                    if (downloadedFile != null) {
-                        ssh.scp(downloadedFile, targetFolder + "webapps/" + artifactId + ".war", new ProgressBar(out, "Uploading " + artifactId + " on " + host));
-                    }
-
-                    // uploading libs
-                    additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
-                    additionalWebapps.forEach(war -> ssh.scp(war, targetFolder + "webapps/" + app.getName(), new ProgressBar(out, "Uploading " + war.getName())));
-
-                    // synchronizing configuration
-                    final List<File> foldersToSyncs = new LinkedList<>();
-                    final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, environment));
-                    configFolders.forEach(folder -> {
-                        final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
-                        if (foldersToSync.isDirectory()) {
-                            out.println("Synchronizing " + foldersToSync.getName() + " folders");
-                            synch(out, ssh, foldersToSync, foldersToSync, targetFolder, app, env);
-                            foldersToSyncs.add(foldersToSync);
-                        } else {
-                            out.println("No '" + folder + "' configuration folder found.");
-                        }
-                    });
-
-                    Collections.reverse(foldersToSyncs);
-
-                    final String envrt =
-                        "export JAVA_HOME=\"" + fixedBase + "java/jdk-" + jdkVersion + "\"\n" +
-                            "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
-                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                            "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
-
-                    {   // setenv needs some more love to get a proper env setup
-                        final File setEnv = new File(workDir, "setenv.sh");
-                        if (!setEnv.isFile()) {
-                            final Optional<File> source = foldersToSyncs.stream().map(f -> new File(f, "bin/setenv.sh")).filter(File::isFile).findFirst();
-                            final StringBuilder content = new StringBuilder();
-                            final Consumer<StringBuilder> appender = b -> {
-                                b.append("\n");
-                                b.append("# Generated by TSM, don't edit please\n");
-                                b.append(envrt);
-                                b.append("# End of TSM edit\n");
-                                b.append("\n");
-                            };
-                            if (source.isPresent()) {
-                                try (final BufferedReader setEnvReader = new BufferedReader(new FileReader(source.get()))) {
-                                    String line;
-                                    boolean jobDone = false;
-                                    while ((line = setEnvReader.readLine()) != null) {
-                                        if (!jobDone && !line.startsWith("#")) {
-                                            // we do it first then the user can still override it but at least we set it up
-                                            appender.accept(content);
-                                            jobDone = true;
-                                        }
-                                        content.append(line).append('\n');
-                                    }
-                                } catch (final IOException e) {
-                                    throw new IllegalStateException(e);
-                                }
-                            } else {
-                                content.append("#! /bin/sh\n");
-                                appender.accept(content);
-                            }
-                            try (final FileWriter writer = new FileWriter(setEnv)) {
-                                writer.write(content.toString());
-                            } catch (final IOException e) {
-                                throw new IllegalStateException(e);
-                            }
-                        }
-                        ssh.scp(setEnv, targetFolder + "bin/" + setEnv.getName(), new ProgressBar(out, "Uploading updated setenv.sh"));
-                    }
-
-                    // now we will add few script/files for easiness but these ones are "nice to have" and not "must have"
-                    final String scriptTop =
-                        "#! /bin/bash\n" +
-                            "\n" +
-                            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-                            "source \"$proc_script_base/bin/setenv.sh\"\n";
-                    addScript(
-                        out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
-                        scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
-                    addScript(
-                        out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
-                        scriptTop +
-                            "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
-                            "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
-                            "\n");
-                    addScript(
-                        out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
-                        scriptTop +
-                            "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
-                            "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
-                            "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
-                            "\n");
-                    addScript(
-                        out, ssh, foldersToSyncs, workDir, targetFolder, "run",
-                        scriptTop +
-                            "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                            "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
-                    addScript(
-                        out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
-                        scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
-
-                    {   // just to be able to know what we did and when when browsing manually the installation, we could add much more if needed
-                        final File metadata = new File(workDir, "tsm-metadata.json"); // sample usage in com.sbux.pos.basket.configuration.aspconfig.TsmPropertiesProvider
-                        try (final FileWriter writer = new FileWriter(metadata)) {
-                            writer.write("{\n");
-                            writer.write("  \"date\":\"" + LocalDateTime.now().toString() + "\",\n");
-                            writer.write("  \"host\":\"" + host + "\",\n");
-                            writer.write("  \"environment\":\"" + environment + "\",\n");
-                            writer.write("  \"application\":{\n");
-                            writer.write("    \"groupId\":\"" + ofNullable(groupId).orElse("") + "\",\n");
-                            writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
-                            writer.write("    \"version\":\"" + ofNullable(version).orElse("") + "\"\n");
-                            writer.write("  },\n");
-                            writer.write("  \"tribestream\":{\n");
-                            writer.write("    \"version\":\"" + serverVersion + "\"\n");
-                            writer.write("  },\n");
-                            writer.write("  \"java\":{\n");
-                            writer.write("    \"version\":\"" + jdkVersion + "\"\n");
-                            writer.write("  }\n");
-                            writer.write("}\n");
+                    downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
+                    final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
+                    if (cacheFile.isFile()) {
+                        out.println("Using locally cached " + artifactId + '.');
+                        try {
+                            IO.copy(cacheFile, downloadedFile);
                         } catch (final IOException e) {
                             throw new IllegalStateException(e);
                         }
-                        ssh.scp(metadata, targetFolder + "conf/" + metadata.getName(), new ProgressBar(out, "Uploading deployment metadata"));
+                    } else {
+                        out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
+                        nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
                     }
+                }
 
-                    // finally make scripts executable if they were not
-                    final List<String> scripts = new ArrayList<>(asList("processes", "startup", "shutdown", "run", "restart"));
-                    scripts.addAll(foldersToSyncs.stream().map(f -> new File(f, "/bin"))
-                        .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
-                        .map(File::getName)
-                        .collect(toList()));
-                    ssh.exec("chmod ug+rwx " + scripts.stream()
-                        .map(n -> "\"" + targetFolder + "bin/" + n + "\"").collect(joining(" ")));
+                final Collection<File> additionalLibs = new LinkedList<>();
+                ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
+                    final String[] segments = lib.split(":");
+                    final File local = new File(workDir, segments[1] + ".jar");
+                    nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                    additionalLibs.add(local);
+                });
 
-                    if (asService) { // needs write access in /etc /init.d/and sudo without password
-                        final File initD = new File(workDir, "initd");
-                        if (!initD.isFile()) {
-                            try (final FileWriter writer = new FileWriter(initD)) {
-                                writer.write("" +
-                                    "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
-                                    "# description: handles " + artifactId + "\n" +
-                                    "\n" + envrt + "\n\n" +
-                                    "exec $CATALINA_HOME/bin/catalina.sh $*" +
-                                    "");
+                final Collection<File> additionalWebapps = new LinkedList<>();
+                ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
+                    final String[] segments = war.split(":");
+                    final File local = new File(workDir, segments[1] + ".war");
+                    nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                    additionalWebapps.add(local);
+                });
+
+                final AtomicReference<String> chosenTribestreamVersion = new AtomicReference<>(tribestreamVersion);
+                final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
+                final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
+                    .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+                final AtomicInteger currentIdx = new AtomicInteger();
+                env.getHosts().forEach(host -> {
+                    out.println("Deploying " + artifactId + " on " + host);
+
+                    // override by host variables
+                    byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
+                    env.getProperties().putIfAbsent("host", host);
+
+                    if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
+                        return;
+                    } // else deploy
+
+                    try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
+                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+
+                        // get tribestream version or just ask the user for it listing the ones the server has
+                        final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
+                        final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
+
+                        final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (contextualEnvironment.getName() + '/'));
+                        final String serverShutdownCmd = targetFolder + "bin/shutdown";
+
+                        ssh
+                            // shutdown if running
+                            .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force")
+                                // recreate the base folder if needed
+                            .exec(String.format("rm -Rf \"%s\"", targetFolder))
+                            .exec(String.format("mkdir -p \"%s\"", targetFolder))
+                                // create app structure
+                            .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done");
+
+                        if (downloadedFile != null) {
+                            ssh.scp(downloadedFile, targetFolder + "webapps/" + artifactId + ".war", new ProgressBar(out, "Uploading " + artifactId + " on " + host));
+                        }
+
+                        // uploading libs
+                        additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
+                        additionalWebapps.forEach(war -> ssh.scp(war, targetFolder + "webapps/" + app.getName(), new ProgressBar(out, "Uploading " + war.getName())));
+
+                        // synchronizing configuration
+                        final List<File> foldersToSyncs = new LinkedList<>();
+                        final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, contextualEnvironment.getName()));
+                        configFolders.forEach(folder -> {
+                            final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
+                            if (foldersToSync.isDirectory()) {
+                                out.println("Synchronizing " + foldersToSync.getName() + " folders");
+                                synch(out, ssh, foldersToSync, foldersToSync, targetFolder, app, env);
+                                foldersToSyncs.add(foldersToSync);
+                            } else {
+                                out.println("No '" + folder + "' configuration folder found.");
+                            }
+                        });
+
+                        Collections.reverse(foldersToSyncs);
+
+                        final String envrt =
+                            "export JAVA_HOME=\"" + fixedBase + "java/jdk-" + jdkVersion + "\"\n" +
+                                "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
+                                "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                                "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
+
+                        {   // setenv needs some more love to get a proper env setup
+                            final File setEnv = new File(workDir, "setenv.sh");
+                            if (!setEnv.isFile()) {
+                                final Optional<File> source = foldersToSyncs.stream().map(f -> new File(f, "bin/setenv.sh")).filter(File::isFile).findFirst();
+                                final StringBuilder content = new StringBuilder();
+                                final Consumer<StringBuilder> appender = b -> {
+                                    b.append("\n");
+                                    b.append("# Generated by TSM, don't edit please\n");
+                                    b.append(envrt);
+                                    b.append("# End of TSM edit\n");
+                                    b.append("\n");
+                                };
+                                if (source.isPresent()) {
+                                    try (final BufferedReader setEnvReader = new BufferedReader(new FileReader(source.get()))) {
+                                        String line;
+                                        boolean jobDone = false;
+                                        while ((line = setEnvReader.readLine()) != null) {
+                                            if (!jobDone && !line.startsWith("#")) {
+                                                // we do it first then the user can still override it but at least we set it up
+                                                appender.accept(content);
+                                                jobDone = true;
+                                            }
+                                            content.append(line).append('\n');
+                                        }
+                                    } catch (final IOException e) {
+                                        throw new IllegalStateException(e);
+                                    }
+                                } else {
+                                    content.append("#! /bin/sh\n");
+                                    appender.accept(content);
+                                }
+                                try (final FileWriter writer = new FileWriter(setEnv)) {
+                                    writer.write(content.toString());
+                                } catch (final IOException e) {
+                                    throw new IllegalStateException(e);
+                                }
+                            }
+                            ssh.scp(setEnv, targetFolder + "bin/" + setEnv.getName(), new ProgressBar(out, "Uploading updated setenv.sh"));
+                        }
+
+                        // now we will add few script/files for easiness but these ones are "nice to have" and not "must have"
+                        final String scriptTop =
+                            "#! /bin/bash\n" +
+                                "\n" +
+                                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                                "source \"$proc_script_base/bin/setenv.sh\"\n";
+                        addScript(
+                            out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
+                            scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
+                        addScript(
+                            out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
+                            scriptTop +
+                                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                                "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
+                                "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
+                                "\n");
+                        addScript(
+                            out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
+                            scriptTop +
+                                "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
+                                "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
+                                "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
+                                "\n");
+                        addScript(
+                            out, ssh, foldersToSyncs, workDir, targetFolder, "run",
+                            scriptTop +
+                                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                                "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
+                        addScript(
+                            out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
+                            scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
+
+                        {   // just to be able to know what we did and when when browsing manually the installation, we could add much more if needed
+                            final File metadata = new File(workDir, "tsm-metadata.json"); // sample usage in com.sbux.pos.basket.configuration.aspconfig.TsmPropertiesProvider
+                            try (final FileWriter writer = new FileWriter(metadata)) {
+                                writer.write("{\n");
+                                writer.write("  \"date\":\"" + LocalDateTime.now().toString() + "\",\n");
+                                writer.write("  \"host\":\"" + host + "\",\n");
+                                writer.write("  \"environment\":\"" + contextualEnvironment.getName() + "\",\n");
+                                writer.write("  \"application\":{\n");
+                                writer.write("    \"groupId\":\"" + ofNullable(groupId).orElse("") + "\",\n");
+                                writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
+                                writer.write("    \"version\":\"" + ofNullable(version).orElse("") + "\"\n");
+                                writer.write("  },\n");
+                                writer.write("  \"tribestream\":{\n");
+                                writer.write("    \"version\":\"" + serverVersion + "\"\n");
+                                writer.write("  },\n");
+                                writer.write("  \"java\":{\n");
+                                writer.write("    \"version\":\"" + jdkVersion + "\"\n");
+                                writer.write("  }\n");
+                                writer.write("}\n");
                             } catch (final IOException e) {
                                 throw new IllegalStateException(e);
                             }
+                            ssh.scp(metadata, targetFolder + "conf/" + metadata.getName(), new ProgressBar(out, "Uploading deployment metadata"));
                         }
-                        final String script = targetFolder + "bin/init.d.sh";
-                        ssh.scp(initD, script, new ProgressBar(out, "Uploading init.d script"));
-                        ssh.exec("sudo mv \"" + script + "\" \"/etc/init.d/" + artifactId + "\"")
-                            .exec("sudo chmod ug+rx \"/etc/init.d/" + artifactId + "\"")
-                            .exec("sudo chkconfig --add " + artifactId);
-                    }
 
-                    if (!restart) {
-                        out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
-                    } else {
-                        out.println("Restarting " + targetFolder + " for host " + host);
-                        ssh.exec("\"" + targetFolder + "bin/startup\"");
-                    }
+                        // finally make scripts executable if they were not
+                        final List<String> scripts = new ArrayList<>(asList("processes", "startup", "shutdown", "run", "restart"));
+                        scripts.addAll(foldersToSyncs.stream().map(f -> new File(f, "/bin"))
+                            .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
+                            .map(File::getName)
+                            .collect(toList()));
+                        ssh.exec("chmod ug+rwx " + scripts.stream()
+                            .map(n -> "\"" + targetFolder + "bin/" + n + "\"").collect(joining(" ")));
 
-                    git.reset(deploymentConfig.getParentFile().getParentFile());
-                    // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
-                }
+                        if (asService) { // needs write access in /etc /init.d/and sudo without password
+                            final File initD = new File(workDir, "initd");
+                            if (!initD.isFile()) {
+                                try (final FileWriter writer = new FileWriter(initD)) {
+                                    writer.write("" +
+                                        "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
+                                        "# description: handles " + artifactId + "\n" +
+                                        "\n" + envrt + "\n\n" +
+                                        "exec $CATALINA_HOME/bin/catalina.sh $*" +
+                                        "");
+                                } catch (final IOException e) {
+                                    throw new IllegalStateException(e);
+                                }
+                            }
+                            final String script = targetFolder + "bin/init.d.sh";
+                            ssh.scp(initD, script, new ProgressBar(out, "Uploading init.d script"));
+                            ssh.exec("sudo mv \"" + script + "\" \"/etc/init.d/" + artifactId + "\"")
+                                .exec("sudo chmod ug+rx \"/etc/init.d/" + artifactId + "\"")
+                                .exec("sudo chkconfig --add " + artifactId);
+                        }
+
+                        if (!restart) {
+                            out.println(artifactId + " setup in " + targetFolder + " for host " + host + ", you can now use start command.");
+                        } else {
+                            out.println("Restarting " + targetFolder + " for host " + host);
+                            ssh.exec("\"" + targetFolder + "bin/startup\"");
+                        }
+
+                        git.reset(deploymentConfig.getParentFile().getParentFile());
+                        // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
+                    }
+                });
             });
         }
     }
@@ -615,12 +623,10 @@ public class Application {
         return v;
     }
 
-    private static void validateEnvironment(final String environment, final String artifactId, final Deployments.Environment env) throws IOException {
-        if (env == null) {
-            throw new IllegalArgumentException("No environment " + environment + " for '" + artifactId + "' application");
-        }
+    private static void validateEnvironment(final String artifactId, final Deployments.ContextualEnvironment contextualEnvironment) {
+        final Deployments.Environment env = contextualEnvironment.getEnvironment();
         if (env.getBase() == null) {
-            throw new IllegalArgumentException("No base for environment " + environment + " for '" + artifactId + "' application");
+            throw new IllegalArgumentException("No base for environment " + env.getNames() + " for '" + artifactId + "' application");
         }
 
         if (ofNullable(env.getHosts()).orElse(emptyList()).isEmpty()) {
@@ -640,12 +646,14 @@ public class Application {
                 .readObject(
                     stream,
                     new JohnzonParameterizedType(Map.class, String.class, Object.class));
+        } catch (final IOException e) {
+            throw new IllegalStateException(e);
         }
-        ofNullable(defaults.get(environment)).ifPresent(def -> def.forEach((k, v) -> env.getProperties().putIfAbsent(k, v.toString())));
+        ofNullable(defaults.get(contextualEnvironment.getName())).ifPresent(def -> def.forEach((k, v) -> env.getProperties().putIfAbsent(k, v.toString())));
         env.getProperties().putIfAbsent("base", env.getBase());
         env.getProperties().putIfAbsent("user", env.getUser());
         env.getProperties().putIfAbsent("artifact", artifactId);
-        env.getProperties().putIfAbsent("environment", environment);
+        env.getProperties().putIfAbsent("environment", contextualEnvironment.getName());
     }
 
     private static InputStream findEnvConfig() {
@@ -699,7 +707,7 @@ public class Application {
         execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds);
     }
 
-    private static void execute(final String environment,
+    private static void execute(final String inEnvironment,
                                 final SshKey sshKey,
                                 final File workDirBase,
                                 final GitConfiguration git,
@@ -714,22 +722,24 @@ public class Application {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            validateEnvironment(environment, artifactId, env);
+            app.findEnvironments(inEnvironment).forEach(env -> {
+                final Deployments.Environment environment = env.getEnvironment();
+                validateEnvironment(artifactId, env);
 
-            final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
+                final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(environment.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
 
-            final AtomicInteger currentIdx = new AtomicInteger();
-            env.getHosts().forEach(host -> {
-                if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
-                    return;
-                }
-                out.println(String.format(textByHost, artifactId, host, environment));
+                final AtomicInteger currentIdx = new AtomicInteger();
+                environment.getHosts().forEach(host -> {
+                    if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
+                        return;
+                    }
+                    out.println(String.format(textByHost, artifactId, host, env.getName()));
 
-                try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                    final String targetFolder = env.getBase() + (env.getBase().endsWith("/") ? "" : "/") + artifactId + (skipEnvFolder ? "" : ("/" + environment));
-                    asList(cmdBuilder.apply(env)).stream().map(c -> String.format(c, targetFolder)).forEach(ssh::exec);
-                }
+                    try (final Ssh ssh = newSsh(sshKey, host, app, environment)) {
+                        final String targetFolder = environment.getBase() + (environment.getBase().endsWith("/") ? "" : "/") + artifactId + (skipEnvFolder ? "" : ("/" + env.getName()));
+                        asList(cmdBuilder.apply(environment)).stream().map(c -> String.format(c, targetFolder)).forEach(ssh::exec);
+                    }
+                });
             });
         }
     }

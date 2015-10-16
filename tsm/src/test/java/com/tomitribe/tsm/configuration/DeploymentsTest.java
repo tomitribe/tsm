@@ -20,6 +20,7 @@ import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 public class DeploymentsTest {
     @Test
@@ -72,7 +73,12 @@ public class DeploymentsTest {
                 assertEquals(asList("h3", "h4", "h5", "h6"), env.getHosts());
             }
 
-        assertEquals(asList("ps", "pd"), app.findEnvironment("ps").getNames());
-        assertNull(app.findEnvironment("missing"));
+        assertEquals(asList("ps", "pd"), app.findEnvironments("ps").iterator().next().getEnvironment().getNames());
+        try {
+            assertNull(app.findEnvironments("missing"));
+            fail("missing is not an environment");
+        } catch (final IllegalArgumentException iae) {
+            // ok
+        }
     }
 }
