@@ -9,9 +9,13 @@
  */
 package com.tomitribe.tsm.configuration;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.johnzon.mapper.MapperBuilder;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -39,10 +43,11 @@ public interface Deployments {
 
         public Collection<ContextualEnvironment> findEnvironments(final String inEnvironment) {
             if ("*".equals(inEnvironment)) {
-                return environments.stream().flatMap(e ->
-                    ofNullable(e.getNames()).orElse(emptyList()).stream()
-                        .map(n -> new ContextualEnvironment(n, e)).collect(toList()).stream()
-                ).collect(toList());
+                return environments.stream()
+                    .flatMap(e ->
+                            ofNullable(e.getNames()).orElse(emptyList()).stream()
+                                .map(n -> new ContextualEnvironment(n, e)).collect(toList()).stream()
+                    ).collect(toList());
             }
             return asList(inEnvironment.split(" *, *")).stream().map(environment -> {
                 final Environment reduce = ofNullable(environments).orElse(emptyList()).stream()
@@ -62,6 +67,10 @@ public interface Deployments {
 
         private void init() {
             ofNullable(environments).orElse(emptyList()).forEach(envrt -> {
+                if (ofNullable(envrt.getHosts()).orElse(emptyList()).isEmpty()) {
+                    throw new IllegalArgumentException("No host for " + envrt);
+                }
+
                 // libs/webapps/base/user are merged there == inheritance
                 // not done for properties since this is handled by interpolation logic in aggregation mode
                 // and here we just handle inheritance as overriding
@@ -79,6 +88,12 @@ public interface Deployments {
                     }
                     if (env.getWebapps() == null) {
                         env.setWebapps(webapps);
+                    }
+                    if (env.getLibs() == null) {
+                        env.setLibs(new ArrayList<>());
+                    }
+                    if (env.getWebapps() == null) {
+                        env.setWebapps(new ArrayList<>());
                     }
 
                     // coordinates
@@ -100,6 +115,14 @@ public interface Deployments {
                         env.setByHostProperties(new HashMap<>());
                     }
                 });
+
+                // validate the envrt
+                final Integer expectedSize = ofNullable(envrt.getHosts()).map(Collection::size).orElse(0);
+                ofNullable(byHostProperties).filter(p -> !p.isEmpty()).ifPresent(m -> m.values().forEach(l -> {
+                    if (l.size() != expectedSize) {
+                        throw new IllegalArgumentException("byHostProperties values size should be the same as for the hosts list");
+                    }
+                }));
             });
         }
     }
@@ -108,6 +131,32 @@ public interface Deployments {
     class ContextualEnvironment {
         private final String name;
         private final Environment environment;
+
+        @Setter(AccessLevel.NONE)
+        @Getter(AccessLevel.NONE)
+        private Environment environmentCopy;
+
+        public void resetEnvironment() {
+            environmentCopy = new Environment();
+            environmentCopy.setProperties(new HashMap<>(environment.getProperties()));
+            environmentCopy.setByHostProperties(new HashMap<>(environment.getByHostProperties()));
+            environmentCopy.setDeployerProperties(new HashMap<>(environment.getDeployerProperties()));
+            environmentCopy.setLibs(new ArrayList<>(environment.getLibs()));
+            environmentCopy.setWebapps(new ArrayList<>(environment.getWebapps()));
+            environmentCopy.setNames(new ArrayList<>(environment.getNames()));
+            environmentCopy.setHosts(new ArrayList<>(environment.getHosts()));
+            environmentCopy.setBase(environment.getBase());
+            environmentCopy.setUser(environment.getUser());
+            environmentCopy.setGroupId(environment.getGroupId());
+            environmentCopy.setVersion(environment.getVersion());
+        }
+
+        public Environment getEnvironment() {
+            if (environmentCopy == null) {
+                resetEnvironment();
+            }
+            return environmentCopy;
+        }
     }
 
     @Data
@@ -123,15 +172,6 @@ public interface Deployments {
         private String groupId;
         private String version;
         private Map<String, String> deployerProperties;
-
-        public void validate() {
-            final Integer expectedSize = ofNullable(hosts).map(Collection::size).orElse(0);
-            ofNullable(byHostProperties).ifPresent(m -> m.values().forEach(l -> {
-                if (l.size() != expectedSize) {
-                    throw new IllegalArgumentException("byHostProperties values size should be the same as for the hosts list");
-                }
-            }));
-        }
     }
 
     static Application read(final java.io.Reader stream) {

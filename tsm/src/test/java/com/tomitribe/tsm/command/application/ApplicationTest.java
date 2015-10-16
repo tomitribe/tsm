@@ -12,11 +12,14 @@ package com.tomitribe.tsm.command.application;
 import com.tomitribe.tsm.command.junit.GitRule;
 import com.tomitribe.tsm.command.junit.SshRule;
 import com.tomitribe.tsm.configuration.GitConfiguration;
+import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.Nexus;
 import com.tomitribe.tsm.configuration.SshKey;
 import org.junit.Rule;
 import org.junit.Test;
+import org.tomitribe.crest.environments.Environment;
+import org.tomitribe.crest.environments.SystemEnvironment;
 import org.tomitribe.util.IO;
 
 import java.io.ByteArrayOutputStream;
@@ -26,17 +29,24 @@ import java.io.PrintStream;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class ApplicationTest {
+    private static final Environment ENVIRONMENT = new SystemEnvironment(singletonMap(GlobalConfiguration.class, new GlobalConfiguration(new File("."))));
+
     @Rule
     public final SshRule ssh = new SshRule("target/ApplicationTest/", cmd -> {
         if (cmd.startsWith("mkdir -p")) {
             asList(cmd.substring("mkdir -p".length()).trim().replace("\"", "").split(" ")).forEach(p -> new File("target/ApplicationTest/", p).mkdirs());
         } else if (cmd.equals("cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art/prod", p).mkdirs());
+        } else if (cmd.equals("cd \"/art2/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
+            asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/prod", p).mkdirs());
+        } else if (cmd.equals("cd \"/art2/other/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
+            asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/other", p).mkdirs());
         }
     });
 
@@ -53,7 +63,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-start-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-start", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
-            "start", new PrintStream(out));
+            "start", new PrintStream(out), ENVIRONMENT);
 
         assertEquals(singletonList("\"/start/prod/bin/startup\""), ssh.commands());
         assertTrue(new String(out.toByteArray()).contains("Starting start on localhost:" + ssh.port() + " for environment prod"));
@@ -69,7 +79,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-stop-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
-            "stop", new PrintStream(out));
+            "stop", new PrintStream(out), ENVIRONMENT);
 
         assertEquals(singletonList("\"/stop/prod/bin/shutdown\" 1200 -force"), ssh.commands());
         assertTrue(new String(out.toByteArray()).contains("Stopping stop on localhost:" + ssh.port() + " for environment prod"));
@@ -85,7 +95,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-ping-work/"), -1,
             new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
-            "ping", new PrintStream(out));
+            "ping", new PrintStream(out), ENVIRONMENT);
 
         assertEquals(singletonList("GET http://127.0.0.1:8443 2>&1 | grep -v 'command not found' || curl -v http://127.0.0.1:8443"), ssh.commands());
         assertTrue(new String(out.toByteArray()).contains("Testing ping on localhost:" + ssh.port() + " for environment prod"));
@@ -116,7 +126,7 @@ public class ApplicationTest {
                     };
                 }
             },
-            "itg", "foo:foo:1", new PrintStream(out));
+            "itg", "foo:foo:1", new PrintStream(out), ENVIRONMENT);
 
         assertEquals(asList(
             "mkdir -p \"/work-provisioning/\" \"/foo/foo-1/\"",
@@ -166,7 +176,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
             "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, false, false,
-            new PrintStream(out), new PrintStream(err));
+            new PrintStream(out), new PrintStream(err), ENVIRONMENT);
 
         assertEquals(asList(
             "[ -f \"/art/prod/bin/shutdown\" ] && \"/art/prod/bin/shutdown\" 1200 -force",
@@ -243,5 +253,51 @@ public class ApplicationTest {
             "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
             "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
         assertTrue(new String(out.toByteArray()).contains("art setup in /art/prod/ for host localhost:" + ssh.port() + ", you can now use start command."));
+    }
+
+    @Test
+    public void installMultipleEnvrts() throws IOException {
+        git.addFile("art2/tribestream/conf/someconf.properties", "e=${environment}").addDeploymentsJson("art2", "prod", "other");
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Application.install(
+            new Nexus("http://faked", null, null) {
+                @Override
+                public DownloadHandler download(final PrintStream out,
+                                                final String groupId, final String artifactId, final String version,
+                                                final String classifier, final String type) {
+                    return destination -> {
+                        try {
+                            IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                        } catch (final IOException e) {
+                            fail(e.getMessage());
+                        }
+                    };
+                }
+            },
+            new Nexus("http://faked", null, null) {
+                @Override
+                public DownloadHandler download(final PrintStream out,
+                                                final String groupId, final String artifactId, final String version,
+                                                final String classifier, final String type) {
+                    return destination -> {
+                        try {
+                            IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                        } catch (final IOException e) {
+                            fail(e.getMessage());
+                        }
+                    };
+                }
+            },
+            new GitConfiguration(git.directory(), "ApplicationTest-install-envs", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+            new LocalFileRepository(new File("target/missing")),
+            new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+            new File("target/ApplicationTest-install-envs/"),
+            "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, false, false,
+            new PrintStream(out), new PrintStream(err), ENVIRONMENT);
+
+        assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art2/prod/conf/someconf.properties"))); // filtering
+        assertEquals("e=other", IO.readString(new File(ssh.getHome(), "art2/other/conf/someconf.properties"))); // filtering
     }
 }

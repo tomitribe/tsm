@@ -21,8 +21,6 @@ import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
 import com.tomitribe.tsm.file.TempDir;
 import com.tomitribe.tsm.ssh.Ssh;
 import lombok.NoArgsConstructor;
-import org.apache.johnzon.mapper.MapperBuilder;
-import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
 import org.tomitribe.crest.api.Command;
 import org.tomitribe.crest.api.Default;
 import org.tomitribe.crest.api.Option;
@@ -33,19 +31,15 @@ import org.tomitribe.util.IO;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -78,9 +72,10 @@ public class Application {
                              @Option("node-index") @Default("-1") final int nodeIndex,
                              final GitConfiguration git,
                              final String artifactId,
-                             @Out final PrintStream out) throws IOException {
+                             @Out final PrintStream out,
+                             final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
             "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
@@ -91,9 +86,10 @@ public class Application {
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
-                            @Out final PrintStream out) throws IOException {
+                            @Out final PrintStream out,
+                            final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
             "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
@@ -104,9 +100,10 @@ public class Application {
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                final GitConfiguration git,
                                final String artifactId,
-                               @Out final PrintStream out) throws IOException {
+                               @Out final PrintStream out,
+                               final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
             "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
@@ -117,7 +114,8 @@ public class Application {
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             final GitConfiguration git,
                             final String artifactId,
-                            @Out final PrintStream out) throws IOException {
+                            @Out final PrintStream out,
+                            final Environment crestEnv) throws IOException {
         execute(
             environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
             "Testing %s on %s for environment %s", e -> {
@@ -125,7 +123,7 @@ public class Application {
                 return new String[]{ // GET is often in PCI zones but not curl so try it first
                     String.format("GET %s 2>&1 | grep -v 'command not found' || curl -v %s", url, url)
                 };
-            });
+            }, crestEnv);
     }
 
     @Command(value = "install-tar.gz", interceptedBy = DefaultParameters.class)
@@ -136,7 +134,8 @@ public class Application {
                                             final LocalFileRepository localFileRepository,
                                             final Nexus nexus,
                                             final String artifactId, final String coordinates,
-                                            @Out final PrintStream out) throws IOException {
+                                            @Out final PrintStream out,
+                                            final Environment crestEnv) throws IOException {
         final String appWorkName = "installtargz_" + artifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
@@ -153,8 +152,11 @@ public class Application {
         try (final FileReader reader = new FileReader(gitClone(git, artifactId, out, workDir))) {
             final Deployments.Application app = Deployments.read(reader);
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
-                final Deployments.Environment env = contextualEnvironment.getEnvironment();
+                contextualEnvironment.resetEnvironment();
                 validateEnvironment(artifactId, contextualEnvironment);
+                overrideDefaultProperties(crestEnv, artifactId, contextualEnvironment);
+
+                final Deployments.Environment env = contextualEnvironment.getEnvironment();
 
                 env.getHosts().forEach(host -> {
                     out.println("Installing " + segments[1] + " to " + host);
@@ -209,11 +211,12 @@ public class Application {
                                          @Option("as-service") final boolean asService,
                                          @Option("restart") @Default("false") final boolean restart,
                                          @Out final PrintStream out,
-                                         @Out final PrintStream err) throws IOException {
+                                         @Out final PrintStream err,
+                                         final Environment crestEnv) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, restart, out, err);
+            nodeIndex, asService, restart, out, err, crestEnv);
     }
 
     // same as install but without groupId/artifactId (read from deployments.json)
@@ -233,11 +236,12 @@ public class Application {
                                     @Option("as-service") final boolean asService,
                                     @Option("restart") @Default("false") final boolean restart,
                                     @Out final PrintStream out,
-                                    @Out final PrintStream err) throws IOException {
+                                    @Out final PrintStream err,
+                                    final Environment crestEnv) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, restart, out, err);
+            nodeIndex, asService, restart, out, err, crestEnv);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -255,7 +259,8 @@ public class Application {
                                @Option("as-service") final boolean asService,
                                @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
-                               @Out final PrintStream err) throws IOException {
+                               @Out final PrintStream err,
+                               final Environment crestEnv) throws IOException {
         final String appWorkName = ofNullable(inGroupId).orElse("-") + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
@@ -265,9 +270,12 @@ public class Application {
             final Deployments.Application app = Deployments.read(reader);
             final AtomicBoolean reInitFiltering = new AtomicBoolean();
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                contextualEnvironment.resetEnvironment();
+                validateEnvironment(inArtifactId, contextualEnvironment);
+                overrideDefaultProperties(crestEnv, inArtifactId, contextualEnvironment);
+
                 final String envName = contextualEnvironment.getName();
                 final Deployments.Environment env = contextualEnvironment.getEnvironment();
-                validateEnvironment(inArtifactId, contextualEnvironment);
 
                 final String artifactId = ofNullable(env.getDeployerProperties().get("artifactId")).orElse(inArtifactId);
                 final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(env.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
@@ -644,47 +652,18 @@ public class Application {
         if (env.getBase() == null) {
             throw new IllegalArgumentException("No base for environment " + env.getNames() + " for '" + artifactId + "' application");
         }
+    }
 
-        if (ofNullable(env.getHosts()).orElse(emptyList()).isEmpty()) {
-            throw new IllegalArgumentException("No host for application " + artifactId);
-        }
+    private static void overrideDefaultProperties(final Environment ce, final String artifactId, final Deployments.ContextualEnvironment contextualEnvironment) {
+        final GlobalConfiguration configuration = ce.findService(GlobalConfiguration.class);
+        final Map<String, Map<String, ?>> defaults = ofNullable(configuration).map(GlobalConfiguration::getDefaults).orElse(emptyMap());
 
-        env.validate();
-
-        // fill default built-in properties if not present
-        if (env.getProperties() == null) {
-            env.setProperties(new HashMap<>());
-        }
-
-        final Map<String, Map<String, ?>> defaults;
-        try (final InputStream stream = findEnvConfig()) {
-            defaults = new MapperBuilder().setAccessModeName("field").setSupportsComments(true).build()
-                .readObject(
-                    stream,
-                    new JohnzonParameterizedType(Map.class, String.class, Object.class));
-        } catch (final IOException e) {
-            throw new IllegalStateException(e);
-        }
+        final Deployments.Environment env = contextualEnvironment.getEnvironment();
         ofNullable(defaults.get(contextualEnvironment.getName())).ifPresent(def -> def.forEach((k, v) -> env.getProperties().putIfAbsent(k, v.toString())));
         env.getProperties().putIfAbsent("base", env.getBase());
         env.getProperties().putIfAbsent("user", env.getUser());
         env.getProperties().putIfAbsent("artifact", artifactId);
         env.getProperties().putIfAbsent("environment", contextualEnvironment.getName());
-    }
-
-    private static InputStream findEnvConfig() {
-        return ofNullable(Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(GlobalConfiguration.class))
-            .map(c -> c.read("environment.defaults.configuration.file"))
-            .map(File::new)
-            .filter(File::isFile)
-            .map(f -> {
-                try {
-                    return InputStream.class.cast(new FileInputStream(f));
-                } catch (final FileNotFoundException e) {
-                    throw new IllegalStateException(e);
-                }
-            })
-            .orElseGet(() -> Thread.currentThread().getContextClassLoader().getResourceAsStream("environment-defaults.json"));
     }
 
     private static File gitClone(final GitConfiguration git, final String base,
@@ -718,9 +697,10 @@ public class Application {
                                 final String artifactId,
                                 final PrintStream out,
                                 final int nodeIndex,
+                                final Environment crestEnv,
                                 final String textByHost,
                                 final String... cmds) throws IOException {
-        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds);
+        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds, crestEnv);
     }
 
     private static void execute(final String inEnvironment,
@@ -731,7 +711,8 @@ public class Application {
                                 final PrintStream out,
                                 final int nodeIndex,
                                 final String textByHost,
-                                final Function<Deployments.Environment, String[]> cmdBuilder) throws IOException {
+                                final Function<Deployments.Environment, String[]> cmdBuilder,
+                                final Environment crestEnv) throws IOException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId);
 
         final File deploymentConfig = gitClone(git, artifactId, out, workDir);
@@ -739,8 +720,11 @@ public class Application {
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
             app.findEnvironments(inEnvironment).forEach(env -> {
-                final Deployments.Environment environment = env.getEnvironment();
+                env.resetEnvironment();
                 validateEnvironment(artifactId, env);
+                overrideDefaultProperties(crestEnv, artifactId, env);
+
+                final Deployments.Environment environment = env.getEnvironment();
 
                 final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(environment.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
 

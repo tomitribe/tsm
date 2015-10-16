@@ -21,6 +21,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.joining;
+
 public class GitRule implements TestRule {
     private final File dir;
     private final Supplier<String> sshUser;
@@ -57,11 +60,15 @@ public class GitRule implements TestRule {
     }
 
     public GitRule addDeploymentsJson(final String artifact) {
+        return addDeploymentsJson(artifact, "prod");
+    }
+
+    public GitRule addDeploymentsJson(final String artifact, final String... envionments) {
         return addFile(
             artifact + "/deployments.json",
             "{\"environments\":[{" +
             "\"hosts\":[\"localhost:" + sshPort.get() + "\"]," +
-            "\"names\":[\"prod\"]," +
+            "\"names\":[" + asList(envionments).stream().map(e -> '"' + e + '"').collect(joining(",")) + "]," +
             "\"base\":\"/\"," +
             "\"user\":\"" + sshUser.get() + "\"" +
             "}]}");
