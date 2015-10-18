@@ -366,7 +366,7 @@ public class Application {
 
                         // uploading libs
                         additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
-                        additionalWebapps.forEach(war -> ssh.scp(war, targetFolder + "webapps/" + app.getName(), new ProgressBar(out, "Uploading " + war.getName())));
+                        additionalWebapps.forEach(war -> ssh.scp(war, targetFolder + "webapps/" + war.getName(), new ProgressBar(out, "Uploading " + war.getName())));
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
