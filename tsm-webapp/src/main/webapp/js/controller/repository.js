@@ -52,7 +52,7 @@ define(
                         showRepository(repository);
                     });
             } else {
-                showRepository(new Repository({name: '', base: ''}));
+                showRepository(new Repository({name: '', base: '', key: ''}));
             }
         }
     };

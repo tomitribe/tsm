@@ -40,7 +40,7 @@ public class RepositoryResource extends JPACanJSResource<SimpleRepository, Repos
         jpa.setBase(view.getBase());
         jpa.setName(view.getName());
         jpa.setCreated(view.getCreated());
-        ofNullable(jpa.getKey()).ifPresent(jpa::setKey);
+        ofNullable(view.getKey()).ifPresent(jpa::setKey);
         // jpa.setUpdated(view.getUpdated()); // done by JPA
         return jpa;
     }

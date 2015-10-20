@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
@@ -80,7 +81,23 @@ public class GitConfiguration {
                 .setURI(repository())
                 .setDirectory(checkoutDir)
                 .setProgressMonitor(new TextProgressMonitor(stdout))
-                .setTransportConfigCallback(newTransportConfigCallback(hasPassphrase));
+                .setTransportConfigCallback(newTransportConfigCallback(jSch -> {
+                    if (new File(sshKey).isFile()) {
+                        if (hasPassphrase) {
+                            try {
+                                jSch.addIdentity(sshKey, sshPassphrase);
+                            } catch (final JSchException e) {
+                                throw new IllegalStateException(e);
+                            }
+                        } else {
+                            try {
+                                jSch.addIdentity(sshKey);
+                            } catch (final JSchException e) {
+                                throw new IllegalStateException(e);
+                            }
+                        }
+                    } // else handled by jgit
+                }));
             if (hasPassphrase) {
                 cloneCommand.setCredentialsProvider(newCredentialsProvider());
             }
@@ -126,7 +143,7 @@ public class GitConfiguration {
         };
     }
 
-    protected TransportConfigCallback newTransportConfigCallback(final boolean hasPassphrase) {
+    protected TransportConfigCallback newTransportConfigCallback(final Consumer<JSch> consumer) {
         return transport -> of(transport).filter(SshTransport.class::isInstance).ifPresent(t -> SshTransport.class.cast(t).setSshSessionFactory(new JschConfigSessionFactory() {
             @Override
             protected void configure(final OpenSshConfig.Host hc, final Session session) {
@@ -137,13 +154,9 @@ public class GitConfiguration {
             @Override
             protected JSch createDefaultJSch(final FS fs) throws JSchException {
                 final JSch jSch = super.createDefaultJSch(fs);
-                if (new File(sshKey).isFile()) {
-                    if (hasPassphrase) {
-                        jSch.addIdentity(sshKey, sshPassphrase);
-                    } else {
-                        jSch.addIdentity(sshKey);
-                    }
-                } // else handled by jgit
+                if (consumer != null) {
+                    consumer.accept(jSch);
+                }
                 return jSch;
             }
         }));

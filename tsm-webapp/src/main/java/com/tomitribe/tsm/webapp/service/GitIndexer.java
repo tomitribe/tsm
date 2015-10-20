@@ -9,15 +9,19 @@
  */
 package com.tomitribe.tsm.webapp.service;
 
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.webapp.io.LoggerWriter;
 import com.tomitribe.tsm.webapp.service.jpa.Repository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
+import org.apache.commons.lang3.text.StrSubstitutor;
 import org.apache.deltaspike.core.api.config.ConfigProperty;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullResult;
+import org.eclipse.jgit.api.TransportConfigCallback;
 
 import javax.annotation.PostConstruct;
 import javax.ejb.ConcurrencyManagement;
@@ -34,6 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
@@ -45,7 +50,7 @@ import static javax.ejb.ConcurrencyManagementType.BEAN;
 @ConcurrencyManagement(BEAN)
 public class GitIndexer {
     @Inject // just some clones for metada, not used for deployments where a clean copy is done
-    @ConfigProperty(name = "tsm.git.workdir", defaultValue = "${openejb.base}/work/tsm/git")
+    @ConfigProperty(name = "tsm.git.workdir", defaultValue = "${catalina.base}/work/tsm/git")
     private String workDirBase;
 
     @PersistenceContext
@@ -56,6 +61,7 @@ public class GitIndexer {
 
     @PostConstruct
     private void reload() {
+        workDirBase = StrSubstitutor.replaceSystemProperties(workDirBase);
         doUpdate();
     }
 
@@ -98,7 +104,20 @@ public class GitIndexer {
             this.directory = new File(baseDir, base.substring(base.indexOf('@') + 1) + '/' + repo + '/' +branch + '/');
         }
 
-        public void update() {
+        @Override
+        protected TransportConfigCallback newTransportConfigCallback(final Consumer<JSch> consumer) {
+            return super.newTransportConfigCallback(jsch -> {
+                if (getSshKey() != null) {
+                    try {
+                        jsch.addIdentity(getBase() + '/' + getRepository(), getSshKey().getBytes(), null, null);
+                    } catch (final JSchException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+            });
+        }
+
+        public void update() {// todo: audit errors
             if (directory.isDirectory()) { // just pull rebase
                 try {
                     final PullResult result = Git.open(directory)
@@ -107,7 +126,7 @@ public class GitIndexer {
                         .setRebase(true)
                         .setRemoteBranchName(getBranch())
                         .setCredentialsProvider(super.newCredentialsProvider())
-                        .setTransportConfigCallback(super.newTransportConfigCallback(hasPassphrase()))
+                        .setTransportConfigCallback(super.newTransportConfigCallback(null))
                         .call();
                     if (!result.isSuccessful()) {
                         throw new IllegalStateException("Can't pull from " + directory);
