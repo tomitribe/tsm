@@ -15,6 +15,7 @@ import com.jcraft.jsch.Session;
 import lombok.Data;
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.TransportConfigCallback;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.UnsupportedCredentialItem;
 import org.eclipse.jgit.lib.TextProgressMonitor;
@@ -72,59 +73,16 @@ public class GitConfiguration {
 
     public void clone(final File checkoutDir, final Writer stdout) {
         requireNonNull(repository, "git.repository needs to be set");
-        final boolean hasPassphrase = sshPassphrase != null && !sshPassphrase.isEmpty() && !NO_PASSPHRASE.equals(sshPassphrase);
+        final boolean hasPassphrase = hasPassphrase();
         try {
             final CloneCommand cloneCommand = Git.cloneRepository()
                 .setBranch(branch)
                 .setURI(repository())
                 .setDirectory(checkoutDir)
                 .setProgressMonitor(new TextProgressMonitor(stdout))
-                .setTransportConfigCallback(transport -> of(transport).filter(SshTransport.class::isInstance).ifPresent(t -> SshTransport.class.cast(t).setSshSessionFactory(new JschConfigSessionFactory() {
-                    @Override
-                    protected void configure(final OpenSshConfig.Host hc, final Session session) {
-                        session.setConfig("StrictHostKeyChecking", "no");
-                        session.setConfig("PreferredAuthentications", "publickey");
-                    }
-
-                    @Override
-                    protected JSch createDefaultJSch(final FS fs) throws JSchException {
-                        final JSch jSch = super.createDefaultJSch(fs);
-                        if (new File(sshKey).isFile()) {
-                            if (hasPassphrase) {
-                                jSch.addIdentity(sshKey, sshPassphrase);
-                            } else {
-                                jSch.addIdentity(sshKey);
-                            }
-                        } // else handled by jgit
-                        return jSch;
-                    }
-                })));
+                .setTransportConfigCallback(newTransportConfigCallback(hasPassphrase));
             if (hasPassphrase) {
-                cloneCommand.setCredentialsProvider(new CredentialsProvider() {
-                    @Override
-                    public boolean isInteractive() {
-                        return false;
-                    }
-
-                    @Override
-                    public boolean supports(final CredentialItem... items) {
-                        return filterPassphrase(items)
-                            .findAny()
-                            .isPresent();
-                    }
-
-                    @Override
-                    public boolean get(final URIish uri, final CredentialItem... items) throws UnsupportedCredentialItem {
-                        filterPassphrase(items).forEach(st -> CredentialItem.StringType.class.cast(st).setValue(sshPassphrase));
-                        return true;
-                    }
-
-                    private Stream<CredentialItem> filterPassphrase(final CredentialItem[] items) {
-                        return asList(ofNullable(items).orElse(new CredentialItem[0])).stream()
-                            .filter(CredentialItem.StringType.class::isInstance)
-                            .filter(st -> st.getPromptText().toLowerCase(Locale.ENGLISH).startsWith("passphrase for"));
-                    }
-                });
+                cloneCommand.setCredentialsProvider(newCredentialsProvider());
             }
 
             final Git git = cloneCommand.call();
@@ -134,6 +92,61 @@ public class GitConfiguration {
         } catch (final GitAPIException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    protected boolean hasPassphrase() {
+        return sshPassphrase != null && !sshPassphrase.isEmpty() && !NO_PASSPHRASE.equals(sshPassphrase);
+    }
+
+    protected CredentialsProvider newCredentialsProvider() {
+        return new CredentialsProvider() {
+            @Override
+            public boolean isInteractive() {
+                return false;
+            }
+
+            @Override
+            public boolean supports(final CredentialItem... items) {
+                return filterPassphrase(items)
+                    .findAny()
+                    .isPresent();
+            }
+
+            @Override
+            public boolean get(final URIish uri, final CredentialItem... items) throws UnsupportedCredentialItem {
+                filterPassphrase(items).forEach(st -> CredentialItem.StringType.class.cast(st).setValue(sshPassphrase));
+                return true;
+            }
+
+            private Stream<CredentialItem> filterPassphrase(final CredentialItem[] items) {
+                return asList(ofNullable(items).orElse(new CredentialItem[0])).stream()
+                    .filter(CredentialItem.StringType.class::isInstance)
+                    .filter(st -> st.getPromptText().toLowerCase(Locale.ENGLISH).startsWith("passphrase for"));
+            }
+        };
+    }
+
+    protected TransportConfigCallback newTransportConfigCallback(final boolean hasPassphrase) {
+        return transport -> of(transport).filter(SshTransport.class::isInstance).ifPresent(t -> SshTransport.class.cast(t).setSshSessionFactory(new JschConfigSessionFactory() {
+            @Override
+            protected void configure(final OpenSshConfig.Host hc, final Session session) {
+                session.setConfig("StrictHostKeyChecking", "no");
+                session.setConfig("PreferredAuthentications", "publickey");
+            }
+
+            @Override
+            protected JSch createDefaultJSch(final FS fs) throws JSchException {
+                final JSch jSch = super.createDefaultJSch(fs);
+                if (new File(sshKey).isFile()) {
+                    if (hasPassphrase) {
+                        jSch.addIdentity(sshKey, sshPassphrase);
+                    } else {
+                        jSch.addIdentity(sshKey);
+                    }
+                } // else handled by jgit
+                return jSch;
+            }
+        }));
     }
 
     public String repository() {

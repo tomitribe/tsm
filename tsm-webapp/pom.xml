@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tomitribe Confidential
+  Copyright Tomitribe Corporation. 2015
+  The source code for this program is not published or otherwise divested
+  of its trade secrets, irrespective of what has been deposited with the
+  U.S. Copyright Office.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+            http://maven.apache.org/POM/4.0.0
+            http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <artifactId>tsm-parent</artifactId>
+    <groupId>com.tomitribe.tsm</groupId>
+    <version>0.2-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>tsm-webapp</artifactId>
+  <name>TSM :: WebApp</name>
+  <description>
+    This is an in progress work and is not yet usable.
+  </description>
+
+  <properties>
+    <deltaspike.version>1.5.0</deltaspike.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.openejb</groupId>
+      <artifactId>javaee-api</artifactId>
+      <version>6.0-6</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.tomitribe.tsm</groupId>
+      <artifactId>tsm</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.tomitribe.web</groupId>
+      <artifactId>tomitribe-web-common</artifactId>
+      <version>0.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.deltaspike.core</groupId>
+      <artifactId>deltaspike-core-api</artifactId>
+      <version>${deltaspike.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.deltaspike.core</groupId>
+      <artifactId>deltaspike-core-impl</artifactId>
+      <version>${deltaspike.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-war-plugin</artifactId>
+        <version>2.6</version>
+        <configuration>
+          <failOnMissingWebXml>false</failOnMissingWebXml>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.openjpa</groupId>
+        <artifactId>openjpa-maven-plugin</artifactId>
+        <version>2.4.0</version>
+        <executions>
+          <execution>
+            <id>enhancer</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>enhance</goal>
+            </goals>
+            <configuration>
+              <includes>com/tomitribe/tsm/webapp/service/jpa/*.class</includes>
+              <persistenceXmlFile>${project.basedir}/src/main/webapp/WEB-INF/persistence.xml</persistenceXmlFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.tomee.maven</groupId>
+        <artifactId>tomee-embedded-maven-plugin</artifactId>
+        <version>7.0.0-SNAPSHOT</version>
+        <configuration>
+          <classpathAsWar>true</classpathAsWar>
+          <context>/tsm</context>
+          <containerProperties>
+            <db>new://Resource?type=DataSource</db>
+            <db.LogSql>true</db.LogSql>
+          </containerProperties>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

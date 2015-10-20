@@ -1,0 +1,9 @@
+{{#if repositories.length}}
+<ul>
+    {{#repositories}}
+    <li><a href="#!repository/{{id}}">{{base}}/{{name}}</a></li>
+    {{/repositories}}
+</ul>
+{{else}}
+    No Repository. <a href="#!repository">Add one.</a>
+{{/if}}
