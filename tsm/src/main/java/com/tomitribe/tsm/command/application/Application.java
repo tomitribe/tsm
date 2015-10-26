@@ -350,7 +350,7 @@ public class Application {
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
                     env.getProperties().putIfAbsent("host", host);
 
-                    if (!selector.isSelected(currentIdx.getAndIncrement())) {
+                    if (nodeIndex >= 0 && !selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
                     } // else deploy
 
@@ -545,7 +545,7 @@ public class Application {
                         reInitFiltering.set(false);
                         // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
 
-                        if (pause.getTime() > 0) {
+                        if (pause.getTime() > 0 && (nodeGroup < 0 || (currentIdx.get() % nodeGroup) == 0)) {
                             try {
                                 Thread.sleep(pause.getUnit().toMillis(pause.getTime()));
                             } catch (final InterruptedException e) {
