@@ -20,6 +20,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.crest.environments.SystemEnvironment;
+import org.tomitribe.util.Duration;
 import org.tomitribe.util.IO;
 
 import java.io.ByteArrayOutputStream;
@@ -61,7 +62,7 @@ public class ApplicationTest {
         Application.start(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-start-work/"), -1,
+            new File("target/ApplicationTest-start-work/"), -1, -1,
             new GitConfiguration(git.directory(), "ApplicationTest-start", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "start", new PrintStream(out), ENVIRONMENT);
 
@@ -77,7 +78,7 @@ public class ApplicationTest {
         Application.stop(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-stop-work/"), -1,
+            new File("target/ApplicationTest-stop-work/"), -1, -1,
             new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "stop", new PrintStream(out), ENVIRONMENT);
 
@@ -93,7 +94,7 @@ public class ApplicationTest {
         Application.ping(
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-ping-work/"), -1,
+            new File("target/ApplicationTest-ping-work/"), -1, -1,
             new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
             "ping", new PrintStream(out), ENVIRONMENT);
 
@@ -175,7 +176,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
-            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, false, false,
+            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1,  -1, new Duration("-1 minutes"), false, false,
             new PrintStream(out), new PrintStream(err), ENVIRONMENT);
 
         assertEquals(asList(
@@ -294,7 +295,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-envs/"),
-            "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, false, false,
+            "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
             new PrintStream(out), new PrintStream(err), ENVIRONMENT);
 
         assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art2/prod/conf/someconf.properties"))); // filtering

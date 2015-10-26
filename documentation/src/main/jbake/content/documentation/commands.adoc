@@ -142,6 +142,12 @@ using as reference the `hosts` list in `deployments.json`. Index starts at 0.
 
 With such an option you can deploy with no down time if you are behind a load balancer.
 
+There is as well an experimental support if the `--node-grouping-size` option working with `--node-index`. When set to a positive integer,
+the selection of nodes is done by chunk of the size specified by this option.
+
+Finally when not used the `--pause` option allows to wait for the specified time (duration format, for instance `"--pause=1 minute"`)
+before deploying the next node.
+
 === Auto-restart after deployment
 
 `application install` command supports `--restart` option allowing to:

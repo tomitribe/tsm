@@ -27,6 +27,7 @@ import org.tomitribe.crest.api.Option;
 import org.tomitribe.crest.api.Out;
 import org.tomitribe.crest.cli.api.CliEnvironment;
 import org.tomitribe.crest.environments.Environment;
+import org.tomitribe.util.Duration;
 import org.tomitribe.util.IO;
 
 import java.io.BufferedReader;
@@ -70,12 +71,13 @@ public class Application {
                              @Option("ssh.") final SshKey sshKey,
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                              @Option("node-index") @Default("-1") final int nodeIndex,
+                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                              final GitConfiguration git,
                              final String artifactId,
                              @Out final PrintStream out,
                              final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
             "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
@@ -84,12 +86,13 @@ public class Application {
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
+                            @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
             "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
@@ -98,12 +101,13 @@ public class Application {
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("node-index") @Default("-1") final int nodeIndex,
+                               @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                final GitConfiguration git,
                                final String artifactId,
                                @Out final PrintStream out,
                                final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, crestEnv,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
             "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
@@ -112,12 +116,13 @@ public class Application {
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
+                            @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex,
+            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup,
             "Testing %s on %s for environment %s", e -> {
                 final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
                 return new String[]{ // GET is often in PCI zones but not curl so try it first
@@ -208,6 +213,8 @@ public class Application {
                                          @Option("environment") final String environment,
                                          final String artifactId, // ie application in git
                                          @Option("node-index") @Default("-1") final int nodeIndex,
+                                         @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                                         @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
                                          @Option("as-service") final boolean asService,
                                          @Option("restart") @Default("false") final boolean restart,
                                          @Out final PrintStream out,
@@ -216,7 +223,7 @@ public class Application {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, restart, out, err, crestEnv);
+            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
     }
 
     // same as install but without groupId/artifactId (read from deployments.json)
@@ -233,6 +240,8 @@ public class Application {
                                     @Option("environment") final String environment,
                                     final String artifactId, // ie application in git
                                     @Option("node-index") @Default("-1") final int nodeIndex,
+                                    @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                                    @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause,
                                     @Option("as-service") final boolean asService,
                                     @Option("restart") @Default("false") final boolean restart,
                                     @Out final PrintStream out,
@@ -241,7 +250,7 @@ public class Application {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, asService, restart, out, err, crestEnv);
+            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -256,6 +265,8 @@ public class Application {
                                @Option("environment") final String inEnvironment,
                                final String inGroupId, final String inArtifactId, final String inVersion,
                                @Option("node-index") @Default("-1") final int nodeIndex,
+                               @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                               @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
                                @Option("as-service") final boolean asService,
                                @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
@@ -331,6 +342,7 @@ public class Application {
                     .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
                 final AtomicInteger currentIdx = new AtomicInteger();
                 reInitFiltering.set(true);
+                final NodeSelector selector = new NodeSelector(nodeIndex, nodeGroup);
                 env.getHosts().forEach(host -> {
                     out.println("Deploying " + artifactId + " on " + host);
 
@@ -338,7 +350,7 @@ public class Application {
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
                     env.getProperties().putIfAbsent("host", host);
 
-                    if (nodeIndex >= 0 && nodeIndex != currentIdx.getAndIncrement()) {
+                    if (!selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
                     } // else deploy
 
@@ -532,6 +544,14 @@ public class Application {
                         git.reset(deploymentConfig.getParentFile().getParentFile());
                         reInitFiltering.set(false);
                         // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
+
+                        if (pause.getTime() > 0) {
+                            try {
+                                Thread.sleep(pause.getUnit().toMillis(pause.getTime()));
+                            } catch (final InterruptedException e) {
+                                Thread.interrupted();
+                            }
+                        }
                     }
                 });
             });
@@ -697,10 +717,11 @@ public class Application {
                                 final String artifactId,
                                 final PrintStream out,
                                 final int nodeIndex,
+                                final int nodeGroup,
                                 final Environment crestEnv,
                                 final String textByHost,
                                 final String... cmds) throws IOException {
-        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, textByHost, e -> cmds, crestEnv);
+        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, textByHost, e -> cmds, crestEnv);
     }
 
     private static void execute(final String inEnvironment,
@@ -710,6 +731,7 @@ public class Application {
                                 final String artifactId,
                                 final PrintStream out,
                                 final int nodeIndex,
+                                final int nodeGroup,
                                 final String textByHost,
                                 final Function<Deployments.Environment, String[]> cmdBuilder,
                                 final Environment crestEnv) throws IOException {
@@ -729,10 +751,12 @@ public class Application {
                 final boolean skipEnvFolder = Boolean.parseBoolean(ofNullable(environment.getDeployerProperties().get("skipEnvironmentFolder")).orElse("false"));
 
                 final AtomicInteger currentIdx = new AtomicInteger();
+                final NodeSelector selector = new NodeSelector(nodeIndex, nodeGroup);
                 environment.getHosts().forEach(host -> {
-                    if (nodeIndex >= 0 && currentIdx.getAndIncrement() != nodeIndex) {
+                    if (!selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
                     }
+
                     out.println(String.format(textByHost, artifactId, host, env.getName()));
 
                     try (final Ssh ssh = newSsh(sshKey, host, app, environment)) {
