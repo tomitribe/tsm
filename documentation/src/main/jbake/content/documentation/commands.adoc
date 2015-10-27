@@ -109,7 +109,8 @@ Tribestream:
 - 0.57.2
 ----
 
-TIP: if you use Tribestream Access Gateway (TAG) and not Tribestream you can replace `tribestream` in all previous commands by `tag`.
+TIP: if you use Tribestream Access Gateway (TAG) and not Tribestream you can replace `tribestream` in all previous commands by `tag` and
+if you prefer to use a plain old Apache TomEE just use `tomee` directly.
 
 == Application
 
