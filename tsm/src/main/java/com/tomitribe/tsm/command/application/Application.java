@@ -9,6 +9,7 @@
  */
 package com.tomitribe.tsm.command.application;
 
+import com.tomitribe.tsm.command.Directories;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
@@ -41,6 +42,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -57,6 +59,7 @@ import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -65,7 +68,7 @@ import static lombok.AccessLevel.PRIVATE;
 
 @Command("application")
 @NoArgsConstructor(access = PRIVATE)
-public class Application {
+public class Application implements Directories {
     @Command(interceptedBy = DefaultParameters.class)
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
@@ -208,6 +211,7 @@ public class Application {
                                          final LocalFileRepository localFileRepository,
                                          @Option("ssh.") final SshKey sshKey,
                                          @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                         @Option("tomee-version") final String tomeeVersion,
                                          @Option("tribestream-version") final String tribestreamVersion,
                                          @Option("java-version") final String javaVersion,
                                          @Option("environment") final String environment,
@@ -221,7 +225,7 @@ public class Application {
                                          @Out final PrintStream err,
                                          final Environment crestEnv) throws IOException {
         install(
-            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
+            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
             nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
     }
@@ -235,6 +239,7 @@ public class Application {
                                     final LocalFileRepository localFileRepository,
                                     @Option("ssh.") final SshKey sshKey,
                                     @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                    @Option("tomee-version") final String tomeeVersion,
                                     @Option("tribestream-version") final String tribestreamVersion,
                                     @Option("java-version") final String javaVersion,
                                     @Option("environment") final String environment,
@@ -248,7 +253,7 @@ public class Application {
                                     @Out final PrintStream err,
                                     final Environment crestEnv) throws IOException {
         install(
-            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tribestreamVersion, javaVersion, environment,
+            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
             nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
     }
@@ -260,6 +265,7 @@ public class Application {
                                final LocalFileRepository localFileRepository,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                               @Option("tomee-version") final String tomeeVersion,
                                @Option("tribestream-version") final String tribestreamVersion,
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String inEnvironment,
@@ -272,6 +278,10 @@ public class Application {
                                @Out final PrintStream out,
                                @Out final PrintStream err,
                                final Environment crestEnv) throws IOException {
+        if (tomeeVersion != null && tribestreamVersion != null) {
+            throw new IllegalArgumentException("Only use either --tomee-version or --tribestream-version");
+        }
+
         final String appWorkName = ofNullable(inGroupId).orElse("-") + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
@@ -336,8 +346,12 @@ public class Application {
                     additionalWebapps.add(local);
                 });
 
-                final AtomicReference<String> chosenTribestreamVersion = new AtomicReference<>(tribestreamVersion);
-                final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion);
+                final AtomicReference<String> chosenServerVersion = new AtomicReference<>(
+                    tribestreamVersion != null ? "tribestream-" + tribestreamVersion :
+                        (tomeeVersion != null ? "apache-tomee-" + tomeeVersion : null));
+
+                final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion == null ? null : "jdk-" + javaVersion);
+
                 final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
                     .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
                 final AtomicInteger currentIdx = new AtomicInteger();
@@ -360,8 +374,10 @@ public class Application {
 
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
-                        final String serverVersion = ofNullable(tribestreamVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "tribestream", chosenTribestreamVersion, "tribestream"));
-                        final String jdkVersion = ofNullable(javaVersion).orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
+                        ofNullable(chosenServerVersion.get())
+                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, SERVER_FOLDER, chosenServerVersion, "tribestream", "apache-tomee"));
+                        ofNullable(chosenJavaVersion.get())
+                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
 
                         ssh
                             // shutdown if running
@@ -397,10 +413,10 @@ public class Application {
                         Collections.reverse(foldersToSyncs);
 
                         final String envrt =
-                            "export JAVA_HOME=\"" + fixedBase + "java/jdk-" + jdkVersion + "\"\n" +
-                            "export CATALINA_HOME=\"" + fixedBase + "tribestream/tribestream-" + serverVersion + "\"\n" +
+                            "export JAVA_HOME=\"" + fixedBase + "java/" + chosenJavaVersion.get() + "\"\n" +
+                            "export CATALINA_HOME=\"" + fixedBase + SERVER_FOLDER + "/" + chosenServerVersion.get() + "\"\n" +
                             "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                            "export CATALINA_PID=\"" + targetFolder + "work/tribestream.pid" + "\"\n";
+                            "export CATALINA_PID=\"" + targetFolder + "work/" + (chosenServerVersion.get().startsWith("apache-tomee") ? "tomee" : "tribestream") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
@@ -491,11 +507,11 @@ public class Application {
                                 writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
                                 writer.write("    \"version\":\"" + ofNullable(version).orElse("") + "\"\n");
                                 writer.write("  },\n");
-                                writer.write("  \"tribestream\":{\n");
-                                writer.write("    \"version\":\"" + serverVersion + "\"\n");
+                                writer.write("  \"server\":{\n");
+                                writer.write("    \"name\":\"" + chosenServerVersion.get() + "\"\n");
                                 writer.write("  },\n");
                                 writer.write("  \"java\":{\n");
-                                writer.write("    \"version\":\"" + jdkVersion + "\"\n");
+                                writer.write("    \"version\":\"" + chosenJavaVersion.get().replace("jdk-", "") + "\"\n");
                                 writer.write("  }\n");
                                 writer.write("}\n");
                             } catch (final IOException e) {
@@ -628,43 +644,84 @@ public class Application {
                                       final Ssh ssh,
                                       final String fixedBase, final String folder,
                                       final AtomicReference<String> currentVersion,
-                                      final String name) {
-        final List<String> versions = asList(capture(() -> ssh.exec("ls \"" + fixedBase + folder + "/\"")).split("\\n+")).stream()
-            .filter(v -> v != null && v.startsWith(name + "-"))
-            .map(v -> v.substring(name.length() + 1 /* 1 = '-' length */))
-            .collect(toList());
-        if (currentVersion.get() != null && !versions.contains(currentVersion.get())) {
-            throw new IllegalStateException("You need " + folder + " " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application.");
+                                      final String... name) {
+        final List<String> names = asList(name);
+        final Map<String, List<String>> versionByName = new HashMap<>();
+        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + folder + "/\"")).split("\\n+")).stream()
+            .filter(v -> v != null && v.startsWith(server + '-'))
+            .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
+            .collect(toList()))
+            .filter(v -> !v.isEmpty())
+            .ifPresent(versions -> versionByName.put(server, versions)));
+
+        if (currentVersion.get() != null &&
+                !versionByName.entrySet().stream()
+                    .flatMap(e -> e.getValue().stream().map(v -> e.getKey() + "-" + v))
+                    .filter(currentVersion.get()::equals)
+                    .findAny().isPresent()) {
+            throw new IllegalStateException(
+                "You need " + folder + " " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
+                "Found: " + versionByName);
         }
-        if (versions.isEmpty()) {
-            throw new IllegalStateException("No " + name + " installed in " + fixedBase + ", please do it before provisioning an application.");
+        if (!versionByName.values().stream().flatMap(Collection::stream).findAny().isPresent()) {
+            throw new IllegalStateException("No " + names + " installed in " + fixedBase + ", please do it before provisioning an application.");
         }
 
-        out.println("You didn't set a " + name + " version, please select one:");
-        versions.forEach(v -> out.println("- " + v));
+        if (names.isEmpty()) {
+            throw new IllegalStateException("No server " + names + " found.");
+        }
 
         final Environment environment = Environment.ENVIRONMENT_THREAD_LOCAL.get();
         final boolean isCli = CliEnvironment.class.isInstance(environment);
 
+        String selectedName;
+        if (versionByName.size() == 1) {
+            selectedName = versionByName.keySet().iterator().next();
+        } else {
+            out.println("Select a server:");
+            versionByName.keySet().forEach(n -> out.println("- " + n));
+
+            String server;
+            do {
+                server = readString(out, environment, isCli, "Selected server: ");
+                if (!versionByName.containsKey(server)) {
+                    err.println("No server " + server + ", please select another one");
+                    server = null;
+                }
+            } while (server == null);
+            selectedName = server;
+        }
+
+        final List<String> potentialVersions = versionByName.get(selectedName);
+        out.println("Select a " + selectedName + " version:");
+        potentialVersions.forEach(v -> out.println("- " + v));
+
         String v;
         do {
-            try {
-                if (!isCli) {
-                    out.print("Enter the " + name + " version: ");
-                    v = System.console().readLine();
-                } else {
-                    v = CliEnvironment.class.cast(environment).reader().readLine("Enter the " + name + " version: ");
-                }
-            } catch (final IOException e) {
-                throw new IllegalStateException(e);
-            }
-            if (!versions.contains(v)) {
+            v = readString(out, environment, isCli, "Selected " + selectedName + " version: ");
+            if (!potentialVersions.contains(v)) {
                 err.println("No version " + v + ", please select another one");
-                v = null; // continue
+                v = null;
             }
         } while (v == null);
-        currentVersion.set(v);
+
+        currentVersion.set(selectedName + "-" + v);
         return v;
+    }
+
+    private static String readString(final PrintStream out, final Environment environment, final boolean isCli, final String text) {
+        String server;
+        try {
+            if (!isCli) {
+                out.print(text);
+                server = System.console().readLine();
+            } else {
+                server = CliEnvironment.class.cast(environment).reader().readLine(text);
+            }
+        } catch (final IOException e) {
+            throw new IllegalStateException(e);
+        }
+        return server;
     }
 
     private static void validateEnvironment(final String artifactId, final Deployments.ContextualEnvironment contextualEnvironment) {

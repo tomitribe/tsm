@@ -176,7 +176,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
-            "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1,  -1, new Duration("-1 minutes"), false, false,
+            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1,  -1, new Duration("-1 minutes"), false, false,
             new PrintStream(out), new PrintStream(err), ENVIRONMENT);
 
         assertEquals(asList(
@@ -196,8 +196,8 @@ public class ApplicationTest {
             "    \"artifactId\":\"art\",\n" +
             "    \"version\":\"1.0\"\n" +
             "  },\n" +
-            "  \"tribestream\":{\n" +
-            "    \"version\":\"0.69\"\n" +
+            "  \"server\":{\n" +
+            "    \"name\":\"tribestream-0.69\"\n" +
             "  },\n" +
             "  \"java\":{\n" +
             "    \"version\":\"8u60\"\n" +
@@ -295,7 +295,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-envs/"),
-            "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
+            null, "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
             new PrintStream(out), new PrintStream(err), ENVIRONMENT);
 
         assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art2/prod/conf/someconf.properties"))); // filtering

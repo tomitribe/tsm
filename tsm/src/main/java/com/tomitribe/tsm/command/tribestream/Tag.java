@@ -41,13 +41,15 @@ public class Tag {
                                final String version,
                                @Out final PrintStream out,
                                final GlobalConfiguration configuration) throws IOException, ScriptException {
-        TribestreamBase.install("TAG", "tribestream-access-gateway", workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
+        ContainerBase.tribestreamInstall("TAG",
+            "com.tomitribe.tribestream", "tribestream-access-gateway", null,
+            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void versions(final TomitribeTribestreamMetadataPrincipal security,
                                 @Option("snapshots") @Default("false") final boolean includeSnapshots,
                                 @Out final PrintStream ps) throws IOException {
-        TribestreamBase.versions("TAG", "tribestream-access-gateway", security, includeSnapshots, ps);
+        ContainerBase.tomitribeVersions("TAG", "tribestream-access-gateway", security, includeSnapshots, ps);
     }
 }

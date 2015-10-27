@@ -41,13 +41,16 @@ public class Tribestream {
                                final String version,
                                @Out final PrintStream out,
                                final GlobalConfiguration configuration) throws IOException, ScriptException {
-        TribestreamBase.install("Tribestream", "tribestream", workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
+        ContainerBase.tribestreamInstall(
+            "Tribestream",
+            "com.tomitribe.tribestream", "tribestream", null,
+            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void versions(final TomitribeTribestreamMetadataPrincipal security,
                                 @Option("snapshots") @Default("false") final boolean includeSnapshots,
                                 @Out final PrintStream ps) throws IOException {
-        TribestreamBase.versions("Tribestream", "tribestream", security, includeSnapshots, ps);
+        ContainerBase.tomitribeVersions("Tribestream", "tribestream", security, includeSnapshots, ps);
     }
 }
