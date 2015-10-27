@@ -136,6 +136,8 @@ application install \
 PRO TIP: you can also specify the git branch to use on the command line using `--git.branch=myBranch`. It is recommanded to have
 branches for fast rollbacks if needed but it is not mandatory.
 
+NOTE: if you use TomEE instead of Tribestream just replace `--tribestream-version` by `--tomee-version`.
+
 === Deployment by instance
 
 `application` commands also supports the option `--node-index=5`. This specify the index to deploy on
