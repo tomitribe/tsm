@@ -9,7 +9,6 @@
  */
 package com.tomitribe.tsm.command.application;
 
-import com.tomitribe.tsm.command.Directories;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
@@ -68,7 +67,7 @@ import static lombok.AccessLevel.PRIVATE;
 
 @Command("application")
 @NoArgsConstructor(access = PRIVATE)
-public class Application implements Directories {
+public class Application {
     @Command(interceptedBy = DefaultParameters.class)
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
@@ -223,11 +222,12 @@ public class Application implements Directories {
                                          @Option("restart") @Default("false") final boolean restart,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err,
-                                         final Environment crestEnv) throws IOException {
+                                         final Environment crestEnv,
+                                         final GlobalConfiguration configuration) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
+            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
     }
 
     // same as install but without groupId/artifactId (read from deployments.json)
@@ -251,11 +251,12 @@ public class Application implements Directories {
                                     @Option("restart") @Default("false") final boolean restart,
                                     @Out final PrintStream out,
                                     @Out final PrintStream err,
-                                    final Environment crestEnv) throws IOException {
+                                    final Environment crestEnv,
+                                    final GlobalConfiguration configuration) throws IOException {
         install(
             nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
             null, artifactId, null, // see install() for details
-            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv);
+            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -277,7 +278,8 @@ public class Application implements Directories {
                                @Option("restart") @Default("false") final boolean restart,
                                @Out final PrintStream out,
                                @Out final PrintStream err,
-                               final Environment crestEnv) throws IOException {
+                               final Environment crestEnv,
+                               final GlobalConfiguration configuration) throws IOException {
         if (tomeeVersion != null && tribestreamVersion != null) {
             throw new IllegalArgumentException("Only use either --tomee-version or --tribestream-version");
         }
@@ -375,7 +377,7 @@ public class Application implements Directories {
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
                         ofNullable(chosenServerVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, SERVER_FOLDER, chosenServerVersion, "tribestream", "apache-tomee"));
+                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, null, chosenServerVersion, "tribestream", "apache-tomee"));
                         ofNullable(chosenJavaVersion.get())
                             .orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
 
@@ -413,11 +415,12 @@ public class Application implements Directories {
 
                         Collections.reverse(foldersToSyncs);
 
+                        final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
                         final String envrt =
                             "export JAVA_HOME=\"" + fixedBase + "java/" + chosenJavaVersion.get() + "\"\n" +
-                            "export CATALINA_HOME=\"" + fixedBase + SERVER_FOLDER + "/" + chosenServerVersion.get() + "\"\n" +
+                            "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
                             "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                            "export CATALINA_PID=\"" + targetFolder + "work/" + (chosenServerVersion.get().startsWith("apache-tomee") ? "tomee" : "tribestream") + ".pid" + "\"\n";
+                            "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
@@ -643,12 +646,13 @@ public class Application implements Directories {
 
     private static String readVersion(final PrintStream out, final PrintStream err,
                                       final Ssh ssh,
-                                      final String fixedBase, final String folder,
+                                      final String fixedBase,
+                                      final String folder, // if null then use current name
                                       final AtomicReference<String> currentVersion,
                                       final String... name) {
         final List<String> names = asList(name);
         final Map<String, List<String>> versionByName = new HashMap<>();
-        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + folder + "/\"")).split("\\n+")).stream()
+        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + (folder == null ? server : folder) + "/\"")).split("\\n+")).stream()
             .filter(v -> v != null && v.startsWith(server + '-'))
             .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
             .collect(toList()))

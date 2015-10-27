@@ -9,7 +9,6 @@
  */
 package com.tomitribe.tsm.command.tribestream;
 
-import com.tomitribe.tsm.command.Directories;
 import com.tomitribe.tsm.configuration.Deployments;
 import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
@@ -51,7 +50,7 @@ import java.util.Locale;
 
 import static java.util.Optional.ofNullable;
 
-class ContainerBase implements Directories {
+class ContainerBase {
     static void tribestreamInstall(final String displayName,
                         final String groupId,
                         final String artifactId,
@@ -163,7 +162,7 @@ class ContainerBase implements Directories {
                         final String fixedBase = env.getEnvironment().getBase() + (env.getEnvironment().getBase().endsWith("/") ? "" : "/");
                         final String remoteWorkDir = fixedBase + "work-provisioning/";
                         final String target = remoteWorkDir + downloadedFile.getName();
-                        final String targetFolder = fixedBase + SERVER_FOLDER + "/" + artifactId + '-' + versionAndClassifier + '/';
+                        final String targetFolder = fixedBase + artifactId + "/" + artifactId + '-' + versionAndClassifier + '/';
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
                             .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
                             .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))

@@ -177,7 +177,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
             null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1,  -1, new Duration("-1 minutes"), false, false,
-            new PrintStream(out), new PrintStream(err), ENVIRONMENT);
+            new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         assertEquals(asList(
             "[ -f \"/art/prod/bin/shutdown\" ] && \"/art/prod/bin/shutdown\" 1200 -force",
@@ -296,7 +296,7 @@ public class ApplicationTest {
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-envs/"),
             null, "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
-            new PrintStream(out), new PrintStream(err), ENVIRONMENT);
+            new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art2/prod/conf/someconf.properties"))); // filtering
         assertEquals("e=other", IO.readString(new File(ssh.getHome(), "art2/other/conf/someconf.properties"))); // filtering
