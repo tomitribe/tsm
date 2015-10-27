@@ -398,7 +398,8 @@ public class Application implements Directories {
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
-                        final List<String> configFolders = asList("tribestream", "tribestream-" + envFolder(env, envName));
+                        final String envFolder = envFolder(env, envName);
+                        final List<String> configFolders = asList("tomee", "tomee-" + envFolder, "tribestream", "tribestream-" + envFolder);
                         configFolders.forEach(folder -> {
                             final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
                             if (foldersToSync.isDirectory()) {
