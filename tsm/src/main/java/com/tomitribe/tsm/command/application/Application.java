@@ -30,8 +30,13 @@ import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.util.Duration;
 import org.tomitribe.util.IO;
 
+import javax.json.Json;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonReaderFactory;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -58,6 +63,7 @@ import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.joining;
@@ -68,6 +74,9 @@ import static lombok.AccessLevel.PRIVATE;
 @Command("application")
 @NoArgsConstructor(access = PRIVATE)
 public class Application {
+    private static final JsonReaderFactory READER_FACTORY = Json.createReaderFactory(
+        Collections.singletonMap("org.apache.johnzon.supports-comments", "true"));
+
     @Command(interceptedBy = DefaultParameters.class)
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
@@ -259,6 +268,73 @@ public class Application {
             nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
     }
 
+    // meta command reading tsm-metadata.json to set git, server, env, app and java config
+    @Command(interceptedBy = DefaultParameters.class, value = "install-from-metadata", usage = "application install-from-metadata my-tsm-metadata.json")
+    public static void installFromMetadata(final Nexus nexus,
+                                           @Option("lib.") final Nexus nexusLib,
+                                           final GitConfiguration git,
+                                           final LocalFileRepository localFileRepository,
+                                           @Option("ssh.") final SshKey sshKey,
+                                           @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                           @Option("node-index") @Default("-1") final int nodeIndex,
+                                           @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                                           @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause,
+                                           @Option("restart") @Default("false") final boolean restart,
+                                           @Out final PrintStream out,
+                                           @Out final PrintStream err,
+                                           final File tsmMetadata,
+                                           final Environment crestEnv,
+                                           final GlobalConfiguration configuration) throws IOException {
+        final String tomee;
+        final String tribestream;
+        final String java;
+        final String groupId;
+        final String artifactId;
+        final String version;
+        final String environment;
+        try (final JsonReader reader = READER_FACTORY.createReader(new FileInputStream(tsmMetadata))) {
+            final JsonObject root = reader.readObject();
+            final JsonObject applicationConfig = requireNonNull(root.getJsonObject("application"), "application configuration missing");
+            final JsonObject serverConfig = requireNonNull(root.getJsonObject("server"), "server configuration missing");
+            final JsonObject gitConfig = requireNonNull(root.getJsonObject("git"), "git configuration missing");
+            final JsonObject javaConfig = requireNonNull(root.getJsonObject("java"), "java configuration missing");
+
+            // environment
+            environment = requireNonNull(root.getString("environment"), "environment configuration missing");
+
+            { // git
+                final String revision = gitConfig.getString("revision");
+                if (revision != null && !"LAST".equals(revision)) {
+                    git.setRevision(revision);
+                }
+                git.setBranch(requireNonNull(gitConfig.getString("branch"), "no git revision"));
+            }
+            { // server
+                final String name = serverConfig.getString("name");
+                if (name.startsWith("tribestream-")) {
+                    tomee = null;
+                    tribestream = name.substring("tribestream-".length());
+                } else {
+                    tribestream = null;
+                    tomee = name.substring("apache-tomee-".length());
+                }
+            }
+            { // java
+                java = javaConfig.getString("version").replace("jdk-", "");
+            }
+            { // app
+                groupId = requireNonNull(applicationConfig.getString("groupId"), "groupId missing");
+                artifactId = requireNonNull(applicationConfig.getString("artifactId"), "artifactId missing");
+                version = requireNonNull(applicationConfig.getString("version"), "version missing");
+            }
+        }
+
+        install(
+            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase,
+            tomee, tribestream, java, environment, groupId, artifactId, version,
+            nodeIndex, nodeGroup, pause, false, restart, out, err, crestEnv, configuration);
+    }
+
     @Command(interceptedBy = DefaultParameters.class)
     public static void install(final Nexus nexus, // likely our apps
                                @Option("lib.") final Nexus nexusLib, // likely central proxy
@@ -384,10 +460,10 @@ public class Application {
                         ssh
                             // shutdown if running
                             .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force")
-                                // recreate the base folder if needed
+                            // recreate the base folder if needed
                             .exec(String.format("rm -Rf \"%s\"", targetFolder))
                             .exec(String.format("mkdir -p \"%s\"", targetFolder))
-                                // create app structure
+                            // create app structure
                             .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done");
 
                         if (downloadedFile != null) {
@@ -418,9 +494,9 @@ public class Application {
                         final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
                         final String envrt =
                             "export JAVA_HOME=\"" + fixedBase + "java/" + chosenJavaVersion.get() + "\"\n" +
-                            "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
-                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                            "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
+                                "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
+                                "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                                "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
@@ -664,13 +740,13 @@ public class Application {
             .ifPresent(versions -> versionByName.put(server, versions)));
 
         if (currentVersion.get() != null &&
-                !versionByName.entrySet().stream()
-                    .flatMap(e -> e.getValue().stream().map(v -> e.getKey() + "-" + v))
-                    .filter(currentVersion.get()::equals)
-                    .findAny().isPresent()) {
+            !versionByName.entrySet().stream()
+                .flatMap(e -> e.getValue().stream().map(v -> e.getKey() + "-" + v))
+                .filter(currentVersion.get()::equals)
+                .findAny().isPresent()) {
             throw new IllegalStateException(
                 "You need " + folder + " " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
-                "Found: " + versionByName);
+                    "Found: " + versionByName);
         }
         if (!versionByName.values().stream().flatMap(Collection::stream).findAny().isPresent()) {
             throw new IllegalStateException("No " + names + " installed in " + fixedBase + ", please do it before provisioning an application.");
