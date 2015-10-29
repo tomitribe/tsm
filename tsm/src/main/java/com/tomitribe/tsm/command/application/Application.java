@@ -511,6 +511,10 @@ public class Application {
                                 writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
                                 writer.write("    \"version\":\"" + ofNullable(version).orElse("") + "\"\n");
                                 writer.write("  },\n");
+                                writer.write("  \"git\":{\n");
+                                writer.write("    \"branch\":\"" + git.getBranch() + "\",\n");
+                                writer.write("    \"revision\":\"" + git.getRevision() + "\"\n");
+                                writer.write("  },\n");
                                 writer.write("  \"server\":{\n");
                                 writer.write("    \"name\":\"" + chosenServerVersion.get() + "\"\n");
                                 writer.write("  },\n");

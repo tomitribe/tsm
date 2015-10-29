@@ -116,7 +116,7 @@ public class ApplicationTest {
             new Nexus("http://faked", null, null) {
                 @Override
                 public DownloadHandler download(final PrintStream out,
-                                                final String groupId,final  String artifactId, final String version,
+                                                final String groupId, final String artifactId, final String version,
                                                 final String classifier, final String type) {
                     return destination -> {
                         try {
@@ -176,7 +176,7 @@ public class ApplicationTest {
             new LocalFileRepository(new File("target/missing")),
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-install-work/"),
-            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1,  -1, new Duration("-1 minutes"), false, false,
+            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
             new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         assertEquals(asList(
@@ -188,13 +188,23 @@ public class ApplicationTest {
             "chmod ug+rwx \"/art/prod/bin/processes\" \"/art/prod/bin/startup\" \"/art/prod/bin/shutdown\" \"/art/prod/bin/run\" \"/art/prod/bin/restart\""), ssh.commands());
         assertEquals("main => com.foo.bar:art:1.0:war", IO.readString(new File(ssh.getHome(), "art/prod/webapps/art.war")));
         assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art/prod/conf/someconf.properties"))); // filtering
-        assertTrue(IO.slurp(new File(ssh.getHome(), "art/prod/conf/tsm-metadata.json")).contains(
+
+        final String meta = IO.slurp(new File(ssh.getHome(), "art/prod/conf/tsm-metadata.json"))
+            .replaceAll("\"date\":\"[^\"]*\"", "\"date\":\"DATE\"")
+            .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"");
+        assertTrue(meta, meta.contains(
+            "{\n" +
+            "  \"date\":\"DATE\",\n" +
             "  \"host\":\"localhost:" + ssh.port() + "\",\n" +
             "  \"environment\":\"prod\",\n" +
             "  \"application\":{\n" +
             "    \"groupId\":\"com.foo.bar\",\n" +
             "    \"artifactId\":\"art\",\n" +
             "    \"version\":\"1.0\"\n" +
+            "  },\n" +
+            "  \"git\":{\n" +
+            "    \"branch\":\"master\",\n" +
+            "    \"revision\":\"REV\"\n" +
             "  },\n" +
             "  \"server\":{\n" +
             "    \"name\":\"tribestream-0.69\"\n" +
@@ -205,54 +215,54 @@ public class ApplicationTest {
             "}\n"));
         assertEquals(
             "#! /bin/bash\n" +
-            "\n" +
-            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-            "source \"$proc_script_base/bin/setenv.sh\"\n" +
-            "ps aux | grep \"$proc_script_base\" | grep -v grep\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/processes")));
+                "\n" +
+                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                "source \"$proc_script_base/bin/setenv.sh\"\n" +
+                "ps aux | grep \"$proc_script_base\" | grep -v grep\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/processes")));
         assertEquals(
             "#! /bin/bash\n" +
-            "\n" +
-            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-            "source \"$proc_script_base/bin/setenv.sh\"\n" +
-            "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/restart")));
+                "\n" +
+                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                "source \"$proc_script_base/bin/setenv.sh\"\n" +
+                "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/restart")));
         assertEquals(
             "#! /bin/bash\n" +
-            "\n" +
-            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-            "source \"$proc_script_base/bin/setenv.sh\"\n" +
-            "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-            "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/run")));
+                "\n" +
+                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                "source \"$proc_script_base/bin/setenv.sh\"\n" +
+                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/run")));
         assertEquals(
             "#! /bin/sh\n" +
-            "\n" +
-            "# Generated by TSM, don't edit please\n" +
-            "export JAVA_HOME=\"/java/jdk-8u60\"\n" +
-            "export CATALINA_HOME=\"/tribestream/tribestream-0.69\"\n" +
-            "export CATALINA_BASE=\"/art/prod/\"\n" +
-            "export CATALINA_PID=\"/art/prod/work/tribestream.pid\"\n" +
-            "# End of TSM edit\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/setenv.sh")));
+                "\n" +
+                "# Generated by TSM, don't edit please\n" +
+                "export JAVA_HOME=\"/java/jdk-8u60\"\n" +
+                "export CATALINA_HOME=\"/tribestream/tribestream-0.69\"\n" +
+                "export CATALINA_BASE=\"/art/prod/\"\n" +
+                "export CATALINA_PID=\"/art/prod/work/tribestream.pid\"\n" +
+                "# End of TSM edit\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/setenv.sh")));
         assertEquals(
             "#! /bin/bash\n" +
-            "\n" +
-            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-            "source \"$proc_script_base/bin/setenv.sh\"\n" +
-            "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
-            "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
-            "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/shutdown")));
+                "\n" +
+                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                "source \"$proc_script_base/bin/setenv.sh\"\n" +
+                "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
+                "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
+                "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/shutdown")));
         assertEquals(
             "#! /bin/bash\n" +
-            "\n" +
-            "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-            "source \"$proc_script_base/bin/setenv.sh\"\n" +
-            "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-            "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
-            "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
-            "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
+                "\n" +
+                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                "source \"$proc_script_base/bin/setenv.sh\"\n" +
+                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
+                "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
+                "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
         assertTrue(new String(out.toByteArray()).contains("art setup in /art/prod/ for host localhost:" + ssh.port() + ", you can now use start command."));
     }
 

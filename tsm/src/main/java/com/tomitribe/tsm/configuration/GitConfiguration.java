@@ -12,7 +12,9 @@ package com.tomitribe.tsm.configuration;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.TransportConfigCallback;
@@ -57,6 +59,9 @@ public class GitConfiguration {
     private String base;
     private String repository;
 
+    @Getter(AccessLevel.NONE)
+    private boolean autoRevision;
+
     public GitConfiguration(
             @Option("git.base") final String base,
             @Option("git.repository") final String repo,
@@ -68,6 +73,7 @@ public class GitConfiguration {
         this.repository = repo;
         this.branch = branch;
         this.revision = revision;
+        this.autoRevision = revision == null;
         this.sshKey = ofNullable(sshKey).map(Substitutors::resolveWithVariables).orElse(null);
         this.sshPassphrase = Substitutors.resolveWithVariables(sshPassphrase);
     }
@@ -103,8 +109,10 @@ public class GitConfiguration {
             }
 
             final Git git = cloneCommand.call();
-            if (revision != null) {
+            if (!autoRevision) {
                 git.checkout().setCreateBranch(true).setName("deployment-" + revision).setStartPoint(revision).call();
+            } else {
+                revision = git.log().setMaxCount(1).call().iterator().next().getName();
             }
         } catch (final GitAPIException e) {
             throw new IllegalStateException(e);
