@@ -492,13 +492,14 @@ public class Application {
                     final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
                     final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (envName + '/'));
                     final String serverShutdownCmd = targetFolder + "bin/shutdown";
+                    final String javaBase = env.getDeployerProperties().getOrDefault("java.base", fixedBase + "java/");
 
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
                         ofNullable(chosenServerVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, null, chosenServerVersion, "tribestream", "apache-tomee"));
+                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, true, chosenServerVersion, "tribestream", "apache-tomee"));
                         ofNullable(chosenJavaVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
+                            .orElseGet(() -> readVersion(out, err, ssh, javaBase, false, chosenJavaVersion, "jdk"));
 
                         // shutdown if running
                         ssh.exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force");
@@ -538,7 +539,7 @@ public class Application {
 
                         final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
                         final String envrt =
-                            "export JAVA_HOME=\"" + fixedBase + "java/" + chosenJavaVersion.get() + "\"\n" +
+                            "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
                             "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
                             "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
                             "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
@@ -704,7 +705,7 @@ public class Application {
 
     private static String envFolder(final Deployments.Environment environment, final String def) {
         return ofNullable(environment.getProperties().get("tsm.tribestream.folder"))
-            .orElseGet(() -> ofNullable(environment.getDeployerProperties().get("tribestream.folder")).orElse(def));
+            .orElseGet(() -> environment.getDeployerProperties().getOrDefault("tribestream.folder", def));
     }
 
     private static void addScript(final boolean forceInit,
@@ -771,12 +772,12 @@ public class Application {
     private static String readVersion(final PrintStream out, final PrintStream err,
                                       final Ssh ssh,
                                       final String fixedBase,
-                                      final String folder, // if null then use current name
+                                      final boolean useNames, // if null then use current name
                                       final AtomicReference<String> currentVersion,
                                       final String... name) {
         final List<String> names = asList(name);
         final Map<String, List<String>> versionByName = new HashMap<>();
-        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + (folder == null ? server : folder) + "/\"")).split("\\n+")).stream()
+        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + (useNames ? server + "/\"" : ""))).split("\\n+")).stream()
             .filter(v -> v != null && v.startsWith(server + '-'))
             .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
             .collect(toList()))
@@ -789,7 +790,7 @@ public class Application {
                 .filter(currentVersion.get()::equals)
                 .findAny().isPresent()) {
             throw new IllegalStateException(
-                "You need " + folder + " " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
+                "You need " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
                     "Found: " + versionByName);
         }
         if (!versionByName.values().stream().flatMap(Collection::stream).findAny().isPresent()) {
