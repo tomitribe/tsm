@@ -493,11 +493,12 @@ public class Application {
                     final String targetFolder = fixedBase + artifactId + "/" + (skipEnvFolder ? "" : (envName + '/'));
                     final String serverShutdownCmd = targetFolder + "bin/shutdown";
                     final String javaBase = env.getDeployerProperties().getOrDefault("java.base", fixedBase + "java/");
+                    final String serverBase = env.getDeployerProperties().getOrDefault("server.base", fixedBase);
 
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
                         ofNullable(chosenServerVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, fixedBase, true, chosenServerVersion, "tribestream", "apache-tomee"));
+                            .orElseGet(() -> readVersion(out, err, ssh, serverBase, true, chosenServerVersion, "tribestream", "apache-tomee"));
                         ofNullable(chosenJavaVersion.get())
                             .orElseGet(() -> readVersion(out, err, ssh, javaBase, false, chosenJavaVersion, "jdk"));
 
@@ -540,7 +541,7 @@ public class Application {
                         final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
                         final String envrt =
                             "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
-                            "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
+                            "export CATALINA_HOME=\"" + serverBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
                             "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
                             "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
