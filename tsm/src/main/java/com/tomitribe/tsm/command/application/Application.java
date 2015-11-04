@@ -212,6 +212,31 @@ public class Application {
         }
     }
 
+    @Command(value = "update-config", interceptedBy = DefaultParameters.class)
+    public static void updateConfig(final GitConfiguration git,
+                                         final LocalFileRepository localFileRepository,
+                                         @Option("ssh.") final SshKey sshKey,
+                                         @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                         @Option("tomee-version") final String tomeeVersion,
+                                         @Option("tribestream-version") final String tribestreamVersion,
+                                         @Option("java-version") final String javaVersion,
+                                         @Option("environment") final String environment,
+                                         final String artifactId,
+                                         @Option("node-index") @Default("-1") final int nodeIndex,
+                                         @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                                         @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
+                                         @Option("as-service") final boolean asService,
+                                         @Option("restart") @Default("false") final boolean restart,
+                                         @Out final PrintStream out,
+                                         @Out final PrintStream err,
+                                         final Environment crestEnv,
+                                         final GlobalConfiguration configuration) throws IOException {
+        install(
+            null, null, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
+            null, artifactId, null, // see install() for details
+            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+    }
+
     @Command(value = "config-only", interceptedBy = DefaultParameters.class)
     public static void installConfigOnly(final Nexus nexus, // likely our apps
                                          @Option("lib.") final Nexus nexusLib, // likely central proxy
@@ -335,9 +360,10 @@ public class Application {
             nodeIndex, nodeGroup, pause, false, restart, out, err, crestEnv, configuration);
     }
 
+    // this is the master logic for all deployments (application, config only etc...)
     @Command(interceptedBy = DefaultParameters.class)
-    public static void install(final Nexus nexus, // likely our apps
-                               @Option("lib.") final Nexus nexusLib, // likely central proxy
+    public static void install(final Nexus nexus, // likely for our apps
+                               @Option("lib.") final Nexus nexusLib, // likely central proxy for webapps and libraries
                                final GitConfiguration git,
                                final LocalFileRepository localFileRepository,
                                @Option("ssh.") final SshKey sshKey,
@@ -383,46 +409,63 @@ public class Application {
                 final String version = ofNullable(inVersion).orElse(env.getVersion());
 
                 final File downloadedFile;
-                if (groupId == null && version == null) {
-                    downloadedFile = null;
-                    out.println("configuration only, skipping artifacts");
-                } else {
-                    downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
-                    if (!downloadedFile.isFile()) {
-                        final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
-                        if (cacheFile.isFile()) {
-                            out.println("Using locally cached " + artifactId + '.');
-                            try {
-                                IO.copy(cacheFile, downloadedFile);
-                            } catch (final IOException e) {
-                                throw new IllegalStateException(e);
+                if (nexus != null) {
+                    if (groupId == null && version == null) {
+                        downloadedFile = null;
+                        out.println("configuration only, skipping artifacts");
+                    } else {
+                        downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
+                        if (!downloadedFile.isFile()) {
+                            final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
+                            if (cacheFile.isFile()) {
+                                out.println("Using locally cached " + artifactId + '.');
+                                try {
+                                    IO.copy(cacheFile, downloadedFile);
+                                } catch (final IOException e) {
+                                    throw new IllegalStateException(e);
+                                }
+                            } else {
+                                out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
+                                nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
                             }
-                        } else {
-                            out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
-                            nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
                         }
                     }
+                } else {
+                    downloadedFile = null;
                 }
 
                 final Collection<File> additionalLibs = new LinkedList<>();
-                ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
-                    final String[] segments = lib.split(":");
-                    final File local = new File(workDir, segments[1] + ".jar");
-                    if (!local.isFile()) {
-                        nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-                    }
-                    additionalLibs.add(local);
-                });
-
                 final Collection<File> additionalWebapps = new LinkedList<>();
-                ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
-                    final String[] segments = war.split(":");
-                    final File local = new File(workDir, segments[1] + ".war");
-                    if (!local.isFile()) {
-                        nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
-                    }
-                    additionalWebapps.add(local);
-                });
+                if (nexusLib != null) {
+                    ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
+                        final String[] segments = lib.split(":");
+                        final File local = new File(workDir, segments[1] + ".jar");
+                        if (!local.isFile()) {
+                            try {
+                                nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                            } catch (final IllegalStateException ise) {
+                                if (nexus != null) {
+                                    nexus.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                                }
+                            }
+                        }
+                        additionalLibs.add(local);
+                    });
+                    ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
+                        final String[] segments = war.split(":");
+                        final File local = new File(workDir, segments[1] + ".war");
+                        if (!local.isFile()) {
+                            try {
+                                nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                            } catch (final IllegalStateException ise) {
+                                if (nexus != null) {
+                                    nexus.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                                }
+                            }
+                        }
+                        additionalWebapps.add(local);
+                    });
+                }
 
                 final AtomicReference<String> chosenServerVersion = new AtomicReference<>(
                     tribestreamVersion != null ? "tribestream-" + tribestreamVersion :
@@ -457,14 +500,16 @@ public class Application {
                         ofNullable(chosenJavaVersion.get())
                             .orElseGet(() -> readVersion(out, err, ssh, fixedBase, "java", chosenJavaVersion, "jdk"));
 
-                        ssh
-                            // shutdown if running
-                            .exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force")
-                            // recreate the base folder if needed
-                            .exec(String.format("rm -Rf \"%s\"", targetFolder))
-                            .exec(String.format("mkdir -p \"%s\"", targetFolder))
+                        // shutdown if running
+                        ssh.exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force");
+                        if (nexus != null) {
+                            // recreate the base folder if needed, if nexus == null we redeploy only the (git) config so dont delete artifacts
+                            ssh.exec(String.format("rm -Rf \"%s\"", targetFolder));
+                        }
+                        // create the structure if needed
+                        ssh.exec(String.format("mkdir -p \"%s\"", targetFolder))
                             // create app structure
-                            .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done");
+                            .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done");
 
                         if (downloadedFile != null) {
                             ssh.scp(downloadedFile, targetFolder + "webapps/" + artifactId + ".war", new ProgressBar(out, "Uploading " + artifactId + " on " + host));
@@ -494,9 +539,9 @@ public class Application {
                         final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
                         final String envrt =
                             "export JAVA_HOME=\"" + fixedBase + "java/" + chosenJavaVersion.get() + "\"\n" +
-                                "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
-                                "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                                "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
+                            "export CATALINA_HOME=\"" + fixedBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
+                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                            "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
@@ -643,7 +688,6 @@ public class Application {
 
                         git.reset(deploymentConfig.getParentFile().getParentFile());
                         reInitFiltering.set(false);
-                        // WARN: don't start now, use start/stop/restart/status commands but not provisioning one!!!
 
                         if (pause.getTime() > 0 && (nodeGroup < 0 || (currentIdx.get() % nodeGroup) == 0)) {
                             try {

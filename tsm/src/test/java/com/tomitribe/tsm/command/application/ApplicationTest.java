@@ -42,11 +42,11 @@ public class ApplicationTest {
     public final SshRule ssh = new SshRule("target/ApplicationTest/", cmd -> {
         if (cmd.startsWith("mkdir -p")) {
             asList(cmd.substring("mkdir -p".length()).trim().replace("\"", "").split(" ")).forEach(p -> new File("target/ApplicationTest/", p).mkdirs());
-        } else if (cmd.equals("cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
+        } else if (cmd.equals("cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art/prod", p).mkdirs());
-        } else if (cmd.equals("cd \"/art2/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
+        } else if (cmd.equals("cd \"/art2/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/prod", p).mkdirs());
-        } else if (cmd.equals("cd \"/art2/other/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done")) {
+        } else if (cmd.equals("cd \"/art2/other/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/other", p).mkdirs());
         }
     });
@@ -183,7 +183,7 @@ public class ApplicationTest {
             "[ -f \"/art/prod/bin/shutdown\" ] && \"/art/prod/bin/shutdown\" 1200 -force",
             "rm -Rf \"/art/prod/\"",
             "mkdir -p \"/art/prod/\"",
-            "cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir $i; done",
+            "cd \"/art/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done",
             "mkdir -p \"/art/prod/conf/\"",
             "chmod ug+rwx \"/art/prod/bin/processes\" \"/art/prod/bin/startup\" \"/art/prod/bin/shutdown\" \"/art/prod/bin/run\" \"/art/prod/bin/restart\""), ssh.commands());
         assertEquals("main => com.foo.bar:art:1.0:war", IO.readString(new File(ssh.getHome(), "art/prod/webapps/art.war")));
