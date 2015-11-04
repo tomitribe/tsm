@@ -89,6 +89,7 @@
           </execution>
         </executions>
       </plugin>
+      <!--
       <plugin>
         <groupId>org.apache.tomee.maven</groupId>
         <artifactId>tomee-embedded-maven-plugin</artifactId>
@@ -102,6 +103,7 @@
           </containerProperties>
         </configuration>
       </plugin>
+      -->
     </plugins>
   </build>
 </project>
