@@ -454,7 +454,7 @@ public class Application {
                     });
                     ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
                         final String[] segments = war.replaceAll("\\?.*", "").split(":");
-                        final int contextIdx = segments[2].indexOf("?context=");
+                        final int contextIdx = war.indexOf("?context=");
 
                         final File local = new File(workDir, segments[1] + ".war");
                         if (!local.isFile()) {
@@ -528,7 +528,7 @@ public class Application {
 
                         // uploading libs
                         additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
-                        additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name, new ProgressBar(out, "Uploading " + war.getName())));
+                        additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name + ".war", new ProgressBar(out, "Uploading " + war.getName())));
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
