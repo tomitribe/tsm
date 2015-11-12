@@ -52,6 +52,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -435,7 +436,7 @@ public class Application {
                 }
 
                 final Collection<File> additionalLibs = new LinkedList<>();
-                final Collection<File> additionalWebapps = new LinkedList<>();
+                final Map<String, File> additionalWebapps = new TreeMap<String, File>();
                 if (nexusLib != null) {
                     ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
                         final String[] segments = lib.split(":");
@@ -452,7 +453,7 @@ public class Application {
                         additionalLibs.add(local);
                     });
                     ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
-                        final String[] segments = war.split(":");
+                        final String[] segments = war.replaceAll("\\?.*", "").split(":");
                         final File local = new File(workDir, segments[1] + ".war");
                         if (!local.isFile()) {
                             try {
@@ -463,7 +464,8 @@ public class Application {
                                 }
                             }
                         }
-                        additionalWebapps.add(local);
+                        final int contextIdx = segments[2].indexOf("?context=");
+                        additionalWebapps.put(contextIdx > 0 ? segments[2].substring(contextIdx + "?context=".length()) : segments[1], local);
                     });
                 }
 
@@ -522,7 +524,7 @@ public class Application {
 
                         // uploading libs
                         additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
-                        additionalWebapps.forEach(war -> ssh.scp(war, targetFolder + "webapps/" + war.getName(), new ProgressBar(out, "Uploading " + war.getName())));
+                        additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name, new ProgressBar(out, "Uploading " + war.getName())));
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
