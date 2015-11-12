@@ -514,7 +514,10 @@ public class Application {
                             .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done");
 
                         if (downloadedFile != null) {
-                            ssh.scp(downloadedFile, targetFolder + "webapps/" + artifactId + ".war", new ProgressBar(out, "Uploading " + artifactId + " on " + host));
+                            ssh.scp(
+                                downloadedFile,
+                                targetFolder + "webapps/" + env.getDeployerProperties().getOrDefault("application.context", artifactId) + ".war",
+                                new ProgressBar(out, "Uploading " + artifactId + " on " + host));
                         }
 
                         // uploading libs
