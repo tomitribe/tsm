@@ -546,7 +546,8 @@ public class Application {
 
                         Collections.reverse(foldersToSyncs);
 
-                        final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" : "tribestream";
+                        final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" :
+                            (chosenServerVersion.get().startsWith("access-gateway") ? "tribestream-access-gateway" : "tribestream");
                         final String envrt =
                             "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
                             "export CATALINA_HOME=\"" + serverBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
