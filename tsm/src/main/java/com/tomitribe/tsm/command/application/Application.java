@@ -458,17 +458,16 @@ public class Application {
 
                         final File local = new File(workDir, segments[1] + ".war");
                         if (!local.isFile()) {
-                            final String warVersion = contextIdx > 0 ? segments[2].substring(0, contextIdx) : segments[2];
                             try {
-                                nexusLib.download(out, segments[0], segments[1], warVersion, null, "war").to(local);
+                                nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
                             } catch (final IllegalStateException ise) {
                                 if (nexus != null) {
-                                    nexus.download(out, segments[0], segments[1], warVersion, null, "war").to(local);
+                                    nexus.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
                                 }
                             }
                         }
 
-                        final String context = contextIdx > 0 ? segments[2].substring(contextIdx + "?context=".length()) : segments[1];
+                        final String context = contextIdx > 0 ? war.substring(contextIdx + "?context=".length()) : segments[1];
                         additionalWebapps.put(context, local);
                     });
                 }
