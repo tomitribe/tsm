@@ -34,6 +34,7 @@ public interface Deployments {
         private Map<String, List<String>> byHostProperties;
         private final Collection<Environment> environments;
 
+        private String classpath;
         private Map<String, String> customLibs;
         private Collection<String> libs;
         private Collection<String> webapps;
@@ -75,53 +76,55 @@ public interface Deployments {
                 // libs/webapps/base/user are merged there == inheritance
                 // not done for properties since this is handled by interpolation logic in aggregation mode
                 // and here we just handle inheritance as overriding
-                ofNullable(envrt).ifPresent(env -> {
-                    if (env.getBase() == null) {
-                        env.setBase(base);
-                    }
-                    if (env.getUser() == null) {
-                        env.setUser(user);
-                    }
+                if (envrt.getBase() == null) {
+                    envrt.setBase(base);
+                }
+                if (envrt.getUser() == null) {
+                    envrt.setUser(user);
+                }
 
-                    // lists are just in override mode, no "merge" logic to avoid misunderstanding
-                    if (env.getLibs() == null) {
-                        env.setLibs(libs);
-                    }
-                    if (env.getCustomLibs() == null) {
-                        env.setCustomLibs(customLibs);
-                    }
-                    if (env.getWebapps() == null) {
-                        env.setWebapps(webapps);
-                    }
-                    if (env.getLibs() == null) {
-                        env.setLibs(new ArrayList<>());
-                    }
-                    if (env.getCustomLibs() == null) {
-                        env.setCustomLibs(new HashMap<>());
-                    }
-                    if (env.getWebapps() == null) {
-                        env.setWebapps(new ArrayList<>());
-                    }
+                if (envrt.getClasspath() == null) {
+                    envrt.setClasspath(classpath);
+                }
 
-                    // coordinates
-                    if (env.getGroupId() == null) {
-                        env.setGroupId(groupId);
-                    }
-                    if (env.getVersion() == null) {
-                        env.setVersion(version);
-                    }
+                // lists are just in override mode, no "merge" logic to avoid misunderstanding
+                if (envrt.getLibs() == null) {
+                    envrt.setLibs(libs);
+                }
+                if (envrt.getCustomLibs() == null) {
+                    envrt.setCustomLibs(customLibs);
+                }
+                if (envrt.getWebapps() == null) {
+                    envrt.setWebapps(webapps);
+                }
+                if (envrt.getLibs() == null) {
+                    envrt.setLibs(new ArrayList<>());
+                }
+                if (envrt.getCustomLibs() == null) {
+                    envrt.setCustomLibs(new HashMap<>());
+                }
+                if (envrt.getWebapps() == null) {
+                    envrt.setWebapps(new ArrayList<>());
+                }
 
-                    // avoid NPE
-                    if (env.getDeployerProperties() == null) {
-                        env.setDeployerProperties(new HashMap<>());
-                    }
-                    if (env.getProperties() == null) {
-                        env.setProperties(new HashMap<>());
-                    }
-                    if (env.getByHostProperties() == null) {
-                        env.setByHostProperties(new HashMap<>());
-                    }
-                });
+                // coordinates
+                if (envrt.getGroupId() == null) {
+                    envrt.setGroupId(groupId);
+                }
+                if (envrt.getVersion() == null) {
+                    envrt.setVersion(version);
+                }
+
+                // avoid NPE
+                if (envrt.getDeployerProperties() == null) {
+                    envrt.setDeployerProperties(new HashMap<>());
+                }
+                if (envrt.getProperties() == null) {
+                    envrt.setProperties(new HashMap<>());
+                }
+                if (envrt.getByHostProperties() == null) {
+                    envrt.setByHostProperties(new HashMap<>());
+                }
 
                 // validate the envrt
                 final Integer expectedSize = ofNullable(envrt.getHosts()).map(Collection::size).orElse(0);
@@ -157,6 +160,7 @@ public interface Deployments {
             environmentCopy.setUser(environment.getUser());
             environmentCopy.setGroupId(environment.getGroupId());
             environmentCopy.setVersion(environment.getVersion());
+            environmentCopy.setClasspath(environment.getClasspath());
         }
 
         public Environment getEnvironment() {
@@ -176,6 +180,7 @@ public interface Deployments {
         private Collection<String> webapps;
         private Collection<String> names;
         private Collection<String> hosts;
+        private String classpath;
         private String base;
         private String user;
         private String groupId;

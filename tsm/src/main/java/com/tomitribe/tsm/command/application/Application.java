@@ -549,6 +549,7 @@ public class Application {
                             "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
                             "export CATALINA_HOME=\"" + serverBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
                             "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                            ofNullable(env.getClasspath()).map(cp -> "export CLASSPATH=\"" + cp + "\"\n").orElse("") + // set the classpath after CATALINA_ to let reuse them
                             "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
