@@ -26,6 +26,7 @@
     <module>tsm</module>
     <module>documentation</module>
     <module>tsm-webapp</module>
+    <module>tsm-cdi</module>
   </modules>
 
   <dependencies>
