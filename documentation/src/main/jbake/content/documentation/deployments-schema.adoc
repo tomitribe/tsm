@@ -16,6 +16,7 @@ Romain Manni-Bucau
     "version": "...",
     "name": "...",
     "libs": ["...", "..."], <1>
+    "customLibs": {"bin/foo.jar": "..."}, <1>
     "webapps": ["...", "..."], <1>
     "properties": {
         "...": "...",
@@ -33,6 +34,7 @@ Romain Manni-Bucau
         "version": "...",
         "hosts": ["...", "..."],
         "libs": ["...", "..."], <1>
+        "customLibs": {"...":"..."}, <1>
         "webapps": ["...", "..."], <1>
         "properties": {
             "...": "...",

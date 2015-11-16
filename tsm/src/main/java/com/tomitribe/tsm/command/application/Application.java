@@ -516,7 +516,14 @@ public class Application {
 
                         // uploading libs
                         additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
-                        additionalCustomLibs.forEach((target, file) -> ssh.scp(file, targetFolder + target, new ProgressBar(out, "Uploading " + file.getName())));
+                        additionalCustomLibs.forEach((target, file) -> {
+                            final String finalFilePath = targetFolder + target;
+                            final int dirSep = finalFilePath.lastIndexOf('/');
+                            if (dirSep > 0) {
+                                ssh.exec("mkdir -p \"" + finalFilePath.substring(0, dirSep) + "\"");
+                            }
+                            ssh.scp(file, finalFilePath, new ProgressBar(out, "Uploading " + file.getName()));
+                        });
                         additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name + ".war", new ProgressBar(out, "Uploading " + war.getName())));
 
                         // synchronizing configuration
