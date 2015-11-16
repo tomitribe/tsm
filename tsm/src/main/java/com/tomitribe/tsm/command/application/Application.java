@@ -436,22 +436,11 @@ public class Application {
                 }
 
                 final Collection<File> additionalLibs = new LinkedList<>();
+                final Map<String, File> additionalCustomLibs = new TreeMap<>();
                 final Map<String, File> additionalWebapps = new TreeMap<String, File>();
                 if (nexusLib != null) {
-                    ofNullable(env.getLibs()).orElse(emptyList()).stream().forEach(lib -> {
-                        final String[] segments = lib.split(":");
-                        final File local = new File(workDir, segments[1] + ".jar");
-                        if (!local.isFile()) {
-                            try {
-                                nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-                            } catch (final IllegalStateException ise) {
-                                if (nexus != null) {
-                                    nexus.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-                                }
-                            }
-                        }
-                        additionalLibs.add(local);
-                    });
+                    ofNullable(env.getLibs()).orElse(emptyList()).forEach(lib -> additionalLibs.add(findLib(nexus, nexusLib, out, workDir, lib)));
+                    ofNullable(env.getCustomLibs()).orElse(emptyMap()).forEach((target, coords) -> additionalCustomLibs.put(target, findLib(nexus, nexusLib, out, workDir, coords)));
                     ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
                         final String[] segments = war.replaceAll("\\?.*", "").split(":");
                         final int contextIdx = war.indexOf("?context=");
@@ -527,6 +516,7 @@ public class Application {
 
                         // uploading libs
                         additionalLibs.forEach(lib -> ssh.scp(lib, targetFolder + "lib/" + lib.getName(), new ProgressBar(out, "Uploading " + lib.getName())));
+                        additionalCustomLibs.forEach((target, file) -> ssh.scp(file, targetFolder + target, new ProgressBar(out, "Uploading " + file.getName())));
                         additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name + ".war", new ProgressBar(out, "Uploading " + war.getName())));
 
                         // synchronizing configuration
@@ -711,6 +701,21 @@ public class Application {
                 });
             });
         }
+    }
+
+    private static File findLib(final Nexus nexus, final Nexus nexusLib, final PrintStream out, final File workDir, final String lib) {
+        final String[] segments = lib.split(":");
+        final File local = new File(workDir, segments[1] + ".jar");
+        if (!local.isFile()) {
+            try {
+                nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+            } catch (final IllegalStateException ise) {
+                if (nexus != null) {
+                    nexus.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
+                }
+            }
+        }
+        return local;
     }
 
     private static String envFolder(final Deployments.Environment environment, final String def) {

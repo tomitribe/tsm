@@ -34,6 +34,7 @@ public interface Deployments {
         private Map<String, List<String>> byHostProperties;
         private final Collection<Environment> environments;
 
+        private Map<String, String> customLibs;
         private Collection<String> libs;
         private Collection<String> webapps;
         private String base;
@@ -86,11 +87,17 @@ public interface Deployments {
                     if (env.getLibs() == null) {
                         env.setLibs(libs);
                     }
+                    if (env.getCustomLibs() == null) {
+                        env.setCustomLibs(customLibs);
+                    }
                     if (env.getWebapps() == null) {
                         env.setWebapps(webapps);
                     }
                     if (env.getLibs() == null) {
                         env.setLibs(new ArrayList<>());
+                    }
+                    if (env.getCustomLibs() == null) {
+                        env.setCustomLibs(new HashMap<>());
                     }
                     if (env.getWebapps() == null) {
                         env.setWebapps(new ArrayList<>());
@@ -141,6 +148,7 @@ public interface Deployments {
             environmentCopy.setProperties(new HashMap<>(environment.getProperties()));
             environmentCopy.setByHostProperties(new HashMap<>(environment.getByHostProperties()));
             environmentCopy.setDeployerProperties(new HashMap<>(environment.getDeployerProperties()));
+            environmentCopy.setCustomLibs(new HashMap<>(environment.getCustomLibs()));
             environmentCopy.setLibs(new ArrayList<>(environment.getLibs()));
             environmentCopy.setWebapps(new ArrayList<>(environment.getWebapps()));
             environmentCopy.setNames(new ArrayList<>(environment.getNames()));
@@ -163,6 +171,7 @@ public interface Deployments {
     class Environment {
         private Map<String, String> properties;
         private Map<String, List<String>> byHostProperties;
+        private Map<String, String> customLibs;
         private Collection<String> libs;
         private Collection<String> webapps;
         private Collection<String> names;
