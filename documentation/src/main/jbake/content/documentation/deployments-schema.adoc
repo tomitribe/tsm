@@ -1,8 +1,8 @@
 = Deployments.json Schema
-Romain Manni-Bucau
-2015-10-14
 :jbake-type: page
 :jbake-status: published
+Romain Manni-Bucau
+2015-10-14
 
 
 `deployments.json` is a central piece of TSM, here is an exhaustive schema:

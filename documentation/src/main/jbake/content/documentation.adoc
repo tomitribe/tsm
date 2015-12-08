@@ -1,8 +1,8 @@
 = Documentation
-Romain Manni-Bucau
-2015-10-13
 :jbake-type: page
 :jbake-status: published
+Romain Manni-Bucau
+2015-10-13
 
 [col-sm-6]
 * link:documentation/concept.html[Concepts]
@@ -13,6 +13,9 @@ Romain Manni-Bucau
 ** link:documentation/deployments-schema.html[Deployments.json Schema]
 * link:documentation/use-case.html[Use Cases]
 * link:documentation/cdi.html[CDI Integration]
+
+[col-sm-6]
+* link:tsm.pdf[PDF Documentation]
 
 [col-sm-6]
 image::images/big-logo.png[TSM Concept,align="center"]

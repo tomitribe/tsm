@@ -1,0 +1,20 @@
+= TSM {projectVersion}
+:toc:
+:title-logo-image: big-logo.png
+Tomitribe
+2015-12-08
+
+include::../jbake/content/documentation/concept.adoc[]
+
+include::../jbake/content/documentation/setup.adoc[]
+
+include::../jbake/content/documentation/commands.adoc[]
+
+include::../jbake/content/documentation/scripting.adoc[]
+
+include::../jbake/content/documentation/deployments-schema.adoc[]
+
+include::../jbake/content/documentation/use-case.adoc[]
+
+include::../jbake/content/documentation/cdi.adoc[]
+

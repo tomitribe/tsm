@@ -1,8 +1,8 @@
 = CDI Integration
-Romain Manni-Bucau
-2015-12-08
 :jbake-type: page
 :jbake-status: published
+Romain Manni-Bucau
+2015-12-08
 
 To make it easy to reuse TSM metadata, `com.tomitribe.tsm:tsm-cdi:${tsm.version}` provides
 a default CDI producer allowing you to get injected most of metadata:
