@@ -12,6 +12,7 @@ Romain Manni-Bucau
 ** link:documentation/scripting.html[Scripting]
 ** link:documentation/deployments-schema.html[Deployments.json Schema]
 * link:documentation/use-case.html[Use Cases]
+* link:documentation/cdi.html[CDI Integration]
 
 [col-sm-6]
 image::images/big-logo.png[TSM Concept,align="center"]

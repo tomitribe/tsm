@@ -79,6 +79,19 @@ JVM:
 TIP: the installation relies on applications but if you share the same machine for several environments or if some applications
 share the same machine you don't need to install java multiple time. Binaries are shared.
 
+
+=== Executed commands
+
+For the installation TSM will execute these commands (${xxxx} values are dependent on your configuration):
+
+1. `mkdir -p ${base}/work-provisioning/ "${base}/java/jdk-${java.version}/"`
+2. upload the jdk tar.gz archive to `${base}/work-provisioning/`
+3. `tar xvf "${base}/work-provisioning/jdk-${java.version}.tar.gz" -C "${base}/java/jdk-${java.version}/" --strip 1`
+4. `rm "${base}/work-provisioning/jdk-${java.version}.tar.gz"`
+
+TIP: doing the same manually on all hosts allows TSM to reuse this manual installation.
+
+
 == Tribestream
 
 
@@ -111,6 +124,17 @@ Tribestream:
 
 TIP: if you use Tribestream Access Gateway (TAG) and not Tribestream you can replace `tribestream` in all previous commands by `tag` and
 if you prefer to use a plain old Apache TomEE just use `tomee` directly.
+
+=== Executed commands
+
+For the installation TSM will execute these commands (${xxxx} values are dependent on your configuration):
+
+1. `mkdir -p "${base}/work-provisioning/" "${base}/tribestream/tribestream-${tribestream.version}/"`
+2. upload the tribestream tar.gz archive to `${base}/work-provisioning/`
+3. `tar xvf "${base}/work-provisioning/tribestream-${tribestream.version}.tar.gz" -C "${base}/tribestream/tribestream-${tribestream.version}/" --strip 1`
+4. `rm "${base}/work-provisioning/tribestream-${tribestream.version}.tar.gz"`
+
+TIP: doing the same manually on all hosts allows TSM to reuse this manual installation. Can be useful in case of a custom distribution not available on a maven repository.
 
 == Application
 
@@ -177,4 +201,41 @@ application stop myApplication --environment=prod
 
 TSM also supports scripting if you want to store in a file commands to setup a complete environment, an application or even a single instance.
 To learn how to do so you can consult out link:scripting.html[Scripting] page.
+
+=== Executed commands
+
+For the installation of a war (default case) TSM will execute these commands (${xxxx} values are dependent on your configuration):
+
+0. If `${base}/${artifactId}/${artifactId}-${version}/bin/shutdown` exists then execute it to ensure the server is not running during the redeployment
+1. `rm -Rf "${base}/${artifactId}/${artifactId}-${version}"`
+2. `mkdir -p "${base}/${artifactId}/${artifactId}-${version}/"`
+3. `for i in bin conf lib logs temp webapps work; do mkdir -p "${base}/${artifactId}/${artifactId}-${version}/$i"; done`
+4. upload the war archive to `${base}/${artifactId}/${artifactId}-${version}/webapps`
+5. (optional) upload the library archives to `${base}/${artifactId}/${artifactId}-${version}/lib`
+6. (optional) upload the custom library archives to `${base}/${artifactId}/${artifactId}-${version}/${lib.mapping}` (useful for custom logging)
+7. upload all configuration filtering the files with the properties of `deployments.json`
+8. rewrite and upload `bin/setenv.sh` script to initialize it with the right `JAVA_HOME`, `TOMCAT_HOME` and `TOMCAT_BASE`
+9. upload all scripts in `${base}/${artifactId}/${artifactId}-${version}/bin/` (startup, shutdown and pre/post hooks if needed)
+10. write deployment status/versions in `tsm-metadata.json` and upload it to `${base}/${artifactId}/${artifactId}-${version}/conf/`
+11. make scripts of previous steps executable (`chmod ug+rwx ${scripts}`)
+12. (if restart option) execute `bin/startup` script
+
+TIP: doing the same manually on all hosts allows TSM to reuse this manual installation.
+
+NOTE: the configuration is deployed in this order: 1) tomee, 2) tomee-${environment}, 3) tribestream, 4) tribestream-${environment}. It means you can
+override any file from previous folder in next folder (example: tomee-prod overrides tomee if there is any overlapping file). All uses application and environment
+properties to filter their content.
+
+These commands are executed for each host of the matching environment in `deployments.json`.
+
+=== Install tar.gz
+
+This command allows to setup a binary from a tar.gz file on the server. It executes the following commands:
+
+1. `mkdir -p ${base}/work-provisioning/ "${base}/${artifactId}/${artifactid}-${version}/"`
+2. upload the tar.gz archive to `${base}/work-provisioning/`
+3. `tar xvf "${base}/work-provisioning/${artifactId}-${java.version}.tar.gz" -C "${base}/${artifactId}/${artifactId}-${version}/" --strip 1`
+4. `rm "${base}/work-provisioning/${artifactId}-${version}.tar.gz"`
+
+TIP: doing the same manually on all hosts allows TSM to reuse this manual installation.
 
