@@ -50,7 +50,7 @@ Then just launch:
 mvn exec:java
 ----
 
-TIP: if you have a local SSH server (localhost:22) just set it up with you TSM key and you will be able to add to `deployments.json`
+TIP: if you have a local SSH server (localhost:22) just set it up with your SSH TSM key and you will be able to add to `deployments.json`
 a "local" profile to deploy locally if you are on UNIx.
 
 NOTE: before launching this command ensure you updated nexus, this can be done with `deploy` command:
