@@ -120,16 +120,18 @@ public class GitIndexer {
         public void update() {// todo: audit errors
             if (directory.isDirectory()) { // just pull rebase
                 try {
-                    final PullResult result = Git.open(directory)
-                        .pull()
-                        .setRemote("origin")
-                        .setRebase(true)
-                        .setRemoteBranchName(getBranch())
-                        .setCredentialsProvider(super.newCredentialsProvider())
-                        .setTransportConfigCallback(super.newTransportConfigCallback(null))
-                        .call();
-                    if (!result.isSuccessful()) {
-                        throw new IllegalStateException("Can't pull from " + directory);
+                    try (final Git open = Git.open(directory)) {
+                        final PullResult result = open
+                            .pull()
+                            .setRemote("origin")
+                            .setRebase(true)
+                            .setRemoteBranchName(getBranch())
+                            .setCredentialsProvider(super.newCredentialsProvider())
+                            .setTransportConfigCallback(super.newTransportConfigCallback(null))
+                            .call();
+                        if (!result.isSuccessful()) {
+                            throw new IllegalStateException("Can't pull from " + directory);
+                        }
                     }
                 } catch (final IllegalStateException ise) {
                     throw ise;

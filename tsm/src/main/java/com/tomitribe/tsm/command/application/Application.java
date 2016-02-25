@@ -28,6 +28,7 @@ import org.tomitribe.crest.api.Out;
 import org.tomitribe.crest.cli.api.CliEnvironment;
 import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.util.Duration;
+import org.tomitribe.util.Files;
 import org.tomitribe.util.IO;
 
 import javax.json.Json;
@@ -192,6 +193,12 @@ public class Application {
                     }
                 });
             });
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // ok
+            }
         }
     }
 
@@ -390,9 +397,9 @@ public class Application {
         final String appWorkName = ofNullable(inGroupId).orElse("-") + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
-        final File deploymentConfig = gitClone(git, inArtifactId, out, workDir);
+        final AtomicReference<File> deploymentConfig = new AtomicReference<>(gitClone(git, inArtifactId, out, workDir));
 
-        try (final FileReader reader = new FileReader(deploymentConfig)) {
+        try (final FileReader reader = new FileReader(deploymentConfig.get())) {
             final Deployments.Application app = Deployments.read(reader);
             final AtomicBoolean reInitFiltering = new AtomicBoolean();
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
@@ -531,7 +538,7 @@ public class Application {
                         final String envFolder = envFolder(env, envName);
                         final List<String> configFolders = asList("tomee", "tomee-" + envFolder, "tribestream", "tribestream-" + envFolder);
                         configFolders.forEach(folder -> {
-                            final File foldersToSync = new File(deploymentConfig.getParentFile(), folder);
+                            final File foldersToSync = new File(deploymentConfig.get().getParentFile(), folder);
                             if (foldersToSync.isDirectory()) {
                                 out.println("Synchronizing " + foldersToSync.getName() + " folders");
                                 synch(out, ssh, foldersToSync, foldersToSync, targetFolder, app, env);
@@ -695,7 +702,11 @@ public class Application {
                             ssh.exec("\"" + targetFolder + "bin/startup\"");
                         }
 
-                        git.reset(deploymentConfig.getParentFile().getParentFile());
+                        final File root = deploymentConfig.get().getParentFile().getParentFile();
+                        final File potentialCopy = git.reset(root, out);
+                        if (potentialCopy != root) { // reset failed, the repo has been checked out again
+                            deploymentConfig.set(new File(potentialCopy, inArtifactId + "/deployments.json"));
+                        }
                         reInitFiltering.set(false);
 
                         if (pause.getTime() > 0 && (nodeGroup < 0 || (currentIdx.get() % nodeGroup) == 0)) {
@@ -708,6 +719,12 @@ public class Application {
                     }
                 });
             });
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // can't delete, pby locked on windows. Since deployments should be done in a temp repo it is ok
+            }
         }
     }
 
@@ -975,6 +992,12 @@ public class Application {
                     }
                 });
             });
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // ok
+            }
         }
     }
 }

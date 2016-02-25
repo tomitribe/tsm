@@ -21,6 +21,7 @@ import com.tomitribe.tsm.http.Http;
 import com.tomitribe.tsm.ssh.Ssh;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
+import org.tomitribe.util.Files;
 import org.tomitribe.util.IO;
 import org.tomitribe.util.Size;
 import org.tomitribe.util.SizeUnit;
@@ -64,7 +65,8 @@ class ContainerBase {
                         final String application,
                         final String version,
                         final PrintStream out,
-                        final GlobalConfiguration configuration) throws IOException, ScriptException {
+                        final GlobalConfiguration configuration,
+                        final String baseUrl) throws IOException, ScriptException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId + "-install");
 
         final File downloadedFile = new File(workDir, artifactId + "-" + version + ".tar.gz");
@@ -77,7 +79,7 @@ class ContainerBase {
 
             String token;
             final String pathWithVersion = groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/tar.gz";
-            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/token/" + pathWithVersion).openConnection());
+            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL(base(baseUrl) + "/downloads/api/catalog/token/" + pathWithVersion).openConnection());
             try {
                 if (HttpsURLConnection.class.isInstance(urlConnection)) {
                     final HttpsURLConnection httpsURLConnection = HttpsURLConnection.class.cast(urlConnection);
@@ -121,7 +123,15 @@ class ContainerBase {
         }
         out.println("Downloaded " + displayName + " in " + downloadedFile + " (" + new Size(downloadedFile.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
 
-        doInstall(displayName, artifactId, inEnvironment, sshKey, git, application, version, out, configuration, workDir, downloadedFile);
+        try {
+            doInstall(displayName, artifactId, inEnvironment, sshKey, git, application, version, out, configuration, workDir, downloadedFile);
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // ok
+            }
+        }
     }
 
     static void doInstall(final String displayName, final String artifactId, final String inEnvironment,
@@ -179,9 +189,10 @@ class ContainerBase {
                                   final String artifactId,
                                   final TomitribeTribestreamMetadataPrincipal security,
                                   final boolean includeSnapshots,
+                                  final String baseUrl,
                                   final PrintStream ps) throws IOException {
         final List<String> lists = new ArrayList<>();
-        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
+        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL(base(baseUrl) + "/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
         try {
             urlConnection.setRequestProperty("Accept", "application/json");
             urlConnection.setRequestProperty("Authorization", security.getAuthorization());
@@ -194,6 +205,10 @@ class ContainerBase {
         }
 
         printVersions(displayName, ps, lists);
+    }
+
+    private static String base(final String baseUrl) {
+        return ofNullable(baseUrl).orElse("https://www.tomitribe.com");
     }
 
     static void printVersions(final String displayName, final PrintStream ps, final List<String> lists) {

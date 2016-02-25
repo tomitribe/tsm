@@ -25,7 +25,9 @@ public interface TempDir {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                Files.remove(dir);
+                if (dir.isDirectory()) {
+                    Files.remove(dir);
+                }
             }
         });
         return workDir;

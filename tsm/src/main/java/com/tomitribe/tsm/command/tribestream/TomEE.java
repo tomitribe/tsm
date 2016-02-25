@@ -21,6 +21,7 @@ import org.tomitribe.crest.api.Command;
 import org.tomitribe.crest.api.Default;
 import org.tomitribe.crest.api.Option;
 import org.tomitribe.crest.api.Out;
+import org.tomitribe.util.Files;
 import org.tomitribe.util.IO;
 import org.tomitribe.util.Size;
 import org.tomitribe.util.SizeUnit;
@@ -74,9 +75,17 @@ public class TomEE {
         }
         out.println("Downloaded TomEE in " + downloadedFile + " (" + new Size(downloadedFile.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
 
-        ContainerBase.doInstall(
-            "TomEE " + classifier, artifactId, environment, sshKey, git, application,
-            version + ofNullable(classifier).map(c -> '-' + c).orElse(""), out, configuration, workDir, downloadedFile);
+        try {
+            ContainerBase.doInstall(
+                "TomEE " + classifier, artifactId, environment, sshKey, git, application,
+                version + ofNullable(classifier).map(c -> '-' + c).orElse(""), out, configuration, workDir, downloadedFile);
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // ok
+            }
+        }
     }
 
     @Command(interceptedBy = DefaultParameters.class)

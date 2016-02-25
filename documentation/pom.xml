@@ -85,7 +85,12 @@
           <dependency>
             <groupId>org.asciidoctor</groupId>
             <artifactId>asciidoctorj</artifactId>
-            <version>1.5.2</version>
+            <version>1.5.4</version>
+          </dependency>
+          <dependency> <!-- for windows -->
+            <groupId>org.jruby</groupId>
+            <artifactId>jruby-complete</artifactId>
+            <version>1.7.21</version>
           </dependency>
         </dependencies>
         <configuration>

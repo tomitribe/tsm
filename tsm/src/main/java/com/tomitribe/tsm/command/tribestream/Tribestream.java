@@ -34,6 +34,7 @@ public class Tribestream {
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
+                               @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
                                final TomitribeTribestreamMetadataPrincipal security,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -44,13 +45,14 @@ public class Tribestream {
         ContainerBase.tribestreamInstall(
             "Tribestream",
             "com.tomitribe.tribestream", "tribestream", null,
-            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
+            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void versions(final TomitribeTribestreamMetadataPrincipal security,
                                 @Option("snapshots") @Default("false") final boolean includeSnapshots,
+                                @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
                                 @Out final PrintStream ps) throws IOException {
-        ContainerBase.tomitribeVersions("Tribestream", "tribestream", security, includeSnapshots, ps);
+        ContainerBase.tomitribeVersions("Tribestream", "tribestream", security, includeSnapshots, baseUrl, ps);
     }
 }

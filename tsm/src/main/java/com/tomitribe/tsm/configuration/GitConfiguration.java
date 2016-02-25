@@ -19,6 +19,7 @@ import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.TransportConfigCallback;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.UnsupportedCredentialItem;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.CredentialItem;
@@ -34,7 +35,13 @@ import org.tomitribe.crest.api.Options;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.Writer;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -63,15 +70,15 @@ public class GitConfiguration {
     private boolean autoRevision;
 
     public GitConfiguration(
-            @Option("git.base") final String base,
-            @Option("git.repository") final String repo,
-            @Option("git.branch") @Default("master") final String branch,
-            @Option("git.revision") final String revision,
-            @Option("git.sshKey") final String sshKey,
-            @Option("git.sshPassphrase") final String sshPassphrase) {
+        @Option("git.base") final String base,
+        @Option("git.repository") final String repo,
+        @Option("git.branch") @Default("master") final String branch,
+        @Option("git.revision") final String revision,
+        @Option("git.sshKey") final String sshKey,
+        @Option("git.sshPassphrase") final String sshPassphrase) {
         this.base = base;
         this.repository = repo;
-        this.branch = branch;
+        this.branch = ofNullable(branch).orElse(HEAD);
         this.revision = revision;
         this.autoRevision = revision == null;
         this.sshKey = ofNullable(sshKey).map(Substitutors::resolveWithVariables).orElse(null);
@@ -108,11 +115,12 @@ public class GitConfiguration {
                 cloneCommand.setCredentialsProvider(newCredentialsProvider());
             }
 
-            final Git git = cloneCommand.call();
-            if (!autoRevision) {
-                git.checkout().setCreateBranch(true).setName("deployment-" + revision).setStartPoint(revision).call();
-            } else {
-                revision = git.log().setMaxCount(1).call().iterator().next().getName();
+            try (final Git git = cloneCommand.call()) {
+                if (!autoRevision) {
+                    git.checkout().setCreateBranch(true).setName("deployment-" + revision).setStartPoint(revision).call();
+                } else {
+                    revision = git.log().setMaxCount(1).call().iterator().next().getName();
+                }
             }
         } catch (final GitAPIException e) {
             throw new IllegalStateException(e);
@@ -174,11 +182,34 @@ public class GitConfiguration {
         return base.startsWith("file:") ? base : base + ":" + repository + ".git";
     }
 
-    public void reset(final File deploymentConfig) {
-        try {
-            Git.open(deploymentConfig).reset().setMode(HARD).setRef(HEAD).call();
-        } catch (final GitAPIException | IOException e) {
-            throw new IllegalStateException(e);
+    public File reset(final File deploymentConfig, final PrintStream out) {
+        int retry = 3;
+        for (int i = 0; i < retry; i++) {
+            try {
+                try (final Git open = Git.open(deploymentConfig)) {
+                    open.reset().setMode(HARD).setRef(getBranch()).call();
+                }
+            } catch (final GitAPIException | IOException e) {
+                throw new IllegalStateException(e);
+            } catch (final JGitInternalException je) {
+                final boolean isWinIssue = je.getMessage().toLowerCase(Locale.ENGLISH).contains("could not rename file");
+                if (!isWinIssue || i == retry - 1) {
+                    if (isWinIssue) { // try to recreate the repo from scratch
+                        final File checkoutDir = new File(deploymentConfig.getParentFile(), deploymentConfig.getName() + "_" + System.currentTimeMillis());
+                        out.println("Can't reset git temporary repository: " + deploymentConfig + ". File is likely locked by another process.");
+                        out.println("Re-checking out the repo in " + checkoutDir);
+                        clone(checkoutDir, new PrintWriter(out));
+                        return checkoutDir;
+                    }
+                    throw new IllegalStateException(je);
+                }
+                try {
+                    Thread.sleep(300);
+                } catch (final InterruptedException e1) {
+                    Thread.interrupted();
+                }
+            }
         }
+        return deploymentConfig;
     }
 }

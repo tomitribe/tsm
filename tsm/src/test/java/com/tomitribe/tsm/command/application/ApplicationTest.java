@@ -134,7 +134,7 @@ public class ApplicationTest {
             "tar xvf \"/work-provisioning/foo-1.tar.gz\" -C \"/foo/foo-1/\" --strip 1",
             "rm \"/work-provisioning/foo-1.tar.gz\""), ssh.commands());
         assertEquals("install.tar.gz", IO.readString(new File(ssh.getHome(), "work-provisioning/foo-1.tar.gz")));
-        assertTrue(new String(out.toByteArray()).contains("foo setup in /foo/foo-1/ for host localhost:" + ssh.port() + "\n"));
+        assertTrue(new String(out.toByteArray()).contains("foo setup in /foo/foo-1/ for host localhost:" + ssh.port()));
     }
 
     @Test
