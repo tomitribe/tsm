@@ -78,7 +78,7 @@ class ContainerBase {
             out.println("Didn't find cached " + displayName + " in " + cacheFile + " so trying to download it for this provisioning.");
 
             String token;
-            final String pathWithVersion = groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/tar.gz";
+            final String pathWithVersion = groupId.replace('/', '.') + "/" + artifactId + "/" + version + "/tar.gz";
             final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL(base(baseUrl) + "/downloads/api/catalog/token/" + pathWithVersion).openConnection());
             try {
                 if (HttpsURLConnection.class.isInstance(urlConnection)) {
