@@ -21,6 +21,7 @@ import com.tomitribe.tsm.http.Http;
 import com.tomitribe.tsm.ssh.Ssh;
 import org.apache.johnzon.mapper.MapperBuilder;
 import org.apache.johnzon.mapper.reflection.JohnzonParameterizedType;
+import org.tomitribe.util.Files;
 import org.tomitribe.util.IO;
 import org.tomitribe.util.Size;
 import org.tomitribe.util.SizeUnit;
@@ -50,11 +51,13 @@ import java.util.Locale;
 
 import static java.util.Optional.ofNullable;
 
-class TribestreamBase {
-    static void install(final String displayName,
+class ContainerBase {
+    static void tribestreamInstall(final String displayName,
+                        final String groupId,
                         final String artifactId,
+                        final String classifier,
                         final File workDirBase,
-                        final String environment,
+                        final String inEnvironment,
                         final SshKey sshKey,
                         final TomitribeTribestreamMetadataPrincipal security,
                         final LocalFileRepository localFileRepository,
@@ -62,11 +65,12 @@ class TribestreamBase {
                         final String application,
                         final String version,
                         final PrintStream out,
-                        final GlobalConfiguration configuration) throws IOException, ScriptException {
+                        final GlobalConfiguration configuration,
+                        final String baseUrl) throws IOException, ScriptException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId + "-install");
 
         final File downloadedFile = new File(workDir, artifactId + "-" + version + ".tar.gz");
-        final File cacheFile = localFileRepository.find("com.tomitribe.tribestream", artifactId, version, null, "tar.gz");
+        final File cacheFile = localFileRepository.find(groupId, artifactId, version, classifier, "tar.gz");
         if (cacheFile.isFile()) {
             out.println("Using locally cached " + displayName + ".");
             IO.copy(cacheFile, downloadedFile);
@@ -74,8 +78,8 @@ class TribestreamBase {
             out.println("Didn't find cached " + displayName + " in " + cacheFile + " so trying to download it for this provisioning.");
 
             String token;
-            final String pathWithVersion = "com.tomitribe.tribestream/" + artifactId + "/" + version + "/tar.gz";
-            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/token/" + pathWithVersion).openConnection());
+            final String pathWithVersion = groupId.replace('/', '.') + "/" + artifactId + "/" + version + "/tar.gz";
+            final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL(base(baseUrl) + "/downloads/api/catalog/token/" + pathWithVersion).openConnection());
             try {
                 if (HttpsURLConnection.class.isInstance(urlConnection)) {
                     final HttpsURLConnection httpsURLConnection = HttpsURLConnection.class.cast(urlConnection);
@@ -119,6 +123,21 @@ class TribestreamBase {
         }
         out.println("Downloaded " + displayName + " in " + downloadedFile + " (" + new Size(downloadedFile.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
 
+        try {
+            doInstall(displayName, artifactId, inEnvironment, sshKey, git, application, version, out, configuration, workDir, downloadedFile);
+        } finally {
+            try {
+                Files.remove(workDir);
+            } catch (final IllegalStateException ise) {
+                // ok
+            }
+        }
+    }
+
+    static void doInstall(final String displayName, final String artifactId, final String inEnvironment,
+                                  final SshKey sshKey, GitConfiguration git, final String application,
+                                  final String versionAndClassifier, final PrintStream out, final GlobalConfiguration configuration,
+                                  final File workDir, final File downloadedFile) throws IOException {
         final File gitConfig = new File(workDir, artifactId + "-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
@@ -129,52 +148,51 @@ class TribestreamBase {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            if (env == null) {
-                throw new IllegalArgumentException("No environment " + environment + " for '" + application + "' application");
-            }
-            if (env.getBase() == null) {
-                throw new IllegalArgumentException("No base for environment " + environment + " for '" + application + "' application");
-            }
-
-            env.getHosts().forEach(host -> {
-                out.println("Deploying " + displayName + " " + version + " on " + host);
-
-                try (final Ssh ssh = new Ssh(
-                    // recreate a ssh key using global config
-                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
-                        ofNullable(sshKey.getPassphrase())
-                            .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
-                                .map(s -> new String(Base64.getDecoder().decode(s)))
-                                .orElse(null)))),
-                    Substitutors.resolveWithVariables(
-                        ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                        env.getProperties(),
-                        app.getProperties()
-                    ))) {
-
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                    final String remoteWorkDir = fixedBase + "work-provisioning/";
-                    final String target = remoteWorkDir + downloadedFile.getName();
-                    final String targetFolder = fixedBase + "tribestream/" + artifactId + '-' + version + '/';
-                    ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
-                        .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
-                        .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
-                        .exec(String.format("rm \"%s\"", target));
-
-                    out.println(displayName + " setup in " + targetFolder + " for host " + host);
+            app.findEnvironments(inEnvironment).forEach(env -> {
+                if (env.getEnvironment().getBase() == null) {
+                    throw new IllegalArgumentException("No base for environment " + env.getName() + " for '" + application + "' application");
                 }
+
+                env.getEnvironment().getHosts().forEach(host -> {
+                    out.println("Deploying " + displayName + " " + versionAndClassifier + " on " + host);
+
+                    try (final Ssh ssh = new Ssh(
+                        // recreate a ssh key using global config
+                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
+                            ofNullable(sshKey.getPassphrase())
+                                .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
+                                    .map(s -> new String(Base64.getDecoder().decode(s)))
+                                    .orElse(null)))),
+                        Substitutors.resolveWithVariables(
+                            ofNullable(env.getEnvironment().getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                            env.getEnvironment().getProperties(),
+                            app.getProperties()
+                        ))) {
+
+                        final String fixedBase = env.getEnvironment().getBase() + (env.getEnvironment().getBase().endsWith("/") ? "" : "/");
+                        final String remoteWorkDir = fixedBase + "work-provisioning/";
+                        final String target = remoteWorkDir + downloadedFile.getName();
+                        final String targetFolder = fixedBase + artifactId + "/" + artifactId + '-' + versionAndClassifier + '/';
+                        ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
+                            .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
+                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
+                            .exec(String.format("rm \"%s\"", target));
+
+                        out.println(displayName + " setup in " + targetFolder + " for host " + host);
+                    }
+                });
             });
         }
     }
 
-    static void versions(final String displayName,
-                         final String artifactId,
-                         final TomitribeTribestreamMetadataPrincipal security,
-                         final boolean includeSnapshots,
-                         final PrintStream ps) throws IOException {
+    static void tomitribeVersions(final String displayName,
+                                  final String artifactId,
+                                  final TomitribeTribestreamMetadataPrincipal security,
+                                  final boolean includeSnapshots,
+                                  final String baseUrl,
+                                  final PrintStream ps) throws IOException {
         final List<String> lists = new ArrayList<>();
-        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL("https://www.tomitribe.com/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
+        final HttpURLConnection urlConnection = HttpURLConnection.class.cast(new URL(base(baseUrl) + "/downloads/api/catalog/artifact/com.tomitribe.tribestream/" + artifactId).openConnection());
         try {
             urlConnection.setRequestProperty("Accept", "application/json");
             urlConnection.setRequestProperty("Authorization", security.getAuthorization());
@@ -186,6 +204,14 @@ class TribestreamBase {
             urlConnection.disconnect();
         }
 
+        printVersions(displayName, ps, lists);
+    }
+
+    private static String base(final String baseUrl) {
+        return ofNullable(baseUrl).orElse("https://www.tomitribe.com");
+    }
+
+    static void printVersions(final String displayName, final PrintStream ps, final List<String> lists) {
         Collections.sort(lists, Comparator.<String>reverseOrder());
         ps.println(displayName + ":");
         lists.stream().map(e -> "- " + e).forEach(ps::println);

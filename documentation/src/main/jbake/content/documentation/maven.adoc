@@ -1,0 +1,61 @@
+= Maven Integration
+:jbake-type: page
+:jbake-status: published
+Romain Manni-Bucau
+2016-02-25
+
+TSM is a simple java application so can be launched with `maven-exec-plugin` using `mainClass` `com.tomitribe.tsm.Tsm`:
+
+[source,java]
+----
+<plugin>
+  <groupId>org.codehaus.mojo</groupId>
+  <artifactId>exec-maven-plugin</artifactId>
+  <version>1.4.0</version>
+  <executions>
+    <execution>
+      <id>default-cli</id>
+      <goals>
+        <goal>java</goal>
+      </goals>
+    </execution>
+  </executions>
+  <configuration>
+    <includePluginDependencies>true</includePluginDependencies>
+    <mainClass>com.tomitribe.tsm.Tsm</mainClass>
+    <arguments> <!-- some sample arguments to redeploy -->
+      <argument>application</argument>
+      <argument>com.company.team</argument>
+      <argument>${project.version}</argument>
+      <argument>--tribestream-version=0.71</argument>
+      <argument>--java-version=8u60</argument>
+      <argument>--restart</argument>
+      <argument>--environment=local</argument>
+    </arguments>
+  </configuration>
+  <dependencies>
+    <dependency>
+      <groupId>com.tomitribe.tsm</groupId>
+      <artifactId>tsm</artifactId>
+      <version>${tsm.version}</version>
+    </dependency>
+  </dependencies>
+</plugin>
+----
+
+Then just launch:
+
+[source]
+----
+mvn exec:java
+----
+
+TIP: if you have a local SSH server (localhost:22) just set it up with your SSH TSM key and you will be able to add to `deployments.json`
+a "local" profile to deploy locally if you are on UNIx.
+
+NOTE: before launching this command ensure you updated nexus, this can be done with `deploy` command:
+
+[source]
+----
+mvn deploy exec:java
+----

@@ -24,6 +24,10 @@ import static lombok.AccessLevel.PRIVATE;
 public class Configuration {
     @Command(value = "reload", interceptedBy = DefaultParameters.class)
     public static void reloadTsmrc(final String file, final GlobalConfiguration configuration) throws IOException {
-        configuration.reload(new File(file.startsWith("~") ? new File(System.getProperty("user.home"), file.substring(1)).getAbsolutePath() : file));
+        final File tsmrcLocation = new File(file.startsWith("~") ? new File(System.getProperty("user.home"), file.substring(1)).getAbsolutePath() : file);
+        if (!tsmrcLocation.isFile()) {
+            throw new IllegalArgumentException(tsmrcLocation.getAbsolutePath() + " doesnt exist");
+        }
+        configuration.reload(tsmrcLocation);
     }
 }

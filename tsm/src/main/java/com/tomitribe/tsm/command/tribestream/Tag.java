@@ -34,6 +34,7 @@ public class Tag {
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
+                               @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
                                final TomitribeTribestreamMetadataPrincipal security,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -41,13 +42,16 @@ public class Tag {
                                final String version,
                                @Out final PrintStream out,
                                final GlobalConfiguration configuration) throws IOException, ScriptException {
-        TribestreamBase.install("TAG", "tribestream-access-gateway", workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration);
+        ContainerBase.tribestreamInstall("TAG",
+            "com.tomitribe.tribestream", "tribestream-access-gateway", null,
+            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
     }
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void versions(final TomitribeTribestreamMetadataPrincipal security,
                                 @Option("snapshots") @Default("false") final boolean includeSnapshots,
+                                @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
                                 @Out final PrintStream ps) throws IOException {
-        TribestreamBase.versions("TAG", "tribestream-access-gateway", security, includeSnapshots, ps);
+        ContainerBase.tomitribeVersions("TAG", "tribestream-access-gateway", security, includeSnapshots, baseUrl, ps);
     }
 }

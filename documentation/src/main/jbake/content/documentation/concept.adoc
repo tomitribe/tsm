@@ -1,8 +1,8 @@
 = Concept
-Romain Manni-Bucau
-2015-10-13
 :jbake-type: page
 :jbake-status: published
+Romain Manni-Bucau
+2015-10-13
 
 
 TSM is designed as a remote deployer. The intention is to automate the deployment process of an application

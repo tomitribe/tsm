@@ -6,35 +6,24 @@
   of its trade secrets, irrespective of what has been deposited with the
   U.S. Copyright Office.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="
-            http://maven.apache.org/POM/4.0.0
-            http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation=" http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <artifactId>tsm-parent</artifactId>
     <groupId>com.tomitribe.tsm</groupId>
-    <version>0.2-SNAPSHOT</version>
+    <version>0.4-SNAPSHOT</version>
   </parent>
 
   <artifactId>tsm</artifactId>
   <name>TSM :: Core</name>
 
   <properties>
-    <jgit.version>4.0.1.201506240215-r</jgit.version>
+    <jgit.version>4.2.0.201601211800-r</jgit.version>
     <crest.version>0.7</crest.version>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <version>1.16.6</version>
-      <scope>provided</scope>
-    </dependency>
-
     <dependency>
       <groupId>org.tomitribe</groupId>
       <artifactId>tomitribe-util</artifactId>

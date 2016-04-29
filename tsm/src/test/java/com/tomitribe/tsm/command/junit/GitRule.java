@@ -21,6 +21,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.joining;
+
 public class GitRule implements TestRule {
     private final File dir;
     private final Supplier<String> sshUser;
@@ -47,9 +50,10 @@ public class GitRule implements TestRule {
         }
 
         try {
-            final Git git = Git.open(dir);
-            git.add().addFilepattern(path).call();
-            git.commit().setMessage("adding " + path).setAuthor("test", "test@test.test").call();
+            try (final Git git = Git.open(dir)) {
+                git.add().addFilepattern(path).call();
+                git.commit().setMessage("adding " + path).setAuthor("test", "test@test.test").call();
+            }
         } catch (final GitAPIException | IOException e) {
             throw new IllegalStateException(e);
         }
@@ -57,14 +61,18 @@ public class GitRule implements TestRule {
     }
 
     public GitRule addDeploymentsJson(final String artifact) {
+        return addDeploymentsJson(artifact, "prod");
+    }
+
+    public GitRule addDeploymentsJson(final String artifact, final String... envionments) {
         return addFile(
             artifact + "/deployments.json",
             "{\"environments\":[{" +
-            "\"hosts\":[\"localhost:" + sshPort.get() + "\"]," +
-            "\"names\":[\"prod\"]," +
-            "\"base\":\"/\"," +
-            "\"user\":\"" + sshUser.get() + "\"" +
-            "}]}");
+                "\"hosts\":[\"localhost:" + sshPort.get() + "\"]," +
+                "\"names\":[" + asList(envionments).stream().map(e -> '"' + e + '"').collect(joining(",")) + "]," +
+                "\"base\":\"/\"," +
+                "\"user\":\"" + sshUser.get() + "\"" +
+                "}]}");
     }
 
     @Override
@@ -72,10 +80,8 @@ public class GitRule implements TestRule {
         return new Statement() {
             @Override
             public void evaluate() throws Throwable {
-                Git.init()
-                    .setDirectory(dir)
-                    .call();
                 try {
+                    Git.init().setDirectory(dir).call().close();
                     base.evaluate();
                 } finally {
                     Files.remove(dir);

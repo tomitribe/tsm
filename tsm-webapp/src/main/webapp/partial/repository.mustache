@@ -1,0 +1,27 @@
+<h2>{{ title }}</h2>
+
+<form id="repository-form" class="form-horizontal" can-submit="doSubmit">
+    <input type="hidden" class="form-control" id="id" can-value="repository.id">
+    <div class="form-group">
+        <label class="col-sm-1 control-label" for="name">Name</label>
+        <div class="col-sm-11">
+            <input type="text" class="form-control" can-value="repository.name" >
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-1 control-label" for="company">Base</label>
+        <div class="col-sm-11">
+            <input type="text" class="form-control" can-value="repository.base" >
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-1 control-label" for="company">Key</label>
+        <div class="col-sm-11">
+            <textarea rows="8" class="form-control" can-value="repository.key"></textarea>
+        </div>
+    </div>
+    {{#repository.id}}
+    <button type="button" class="btn btn-danger" can-click="{ doDelete }">Delete</button>
+    {{/repository.id}}
+    <button type="submit" class="btn btn-primary pull-right">Save</button>
+</form>

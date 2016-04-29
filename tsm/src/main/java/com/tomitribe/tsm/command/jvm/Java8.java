@@ -65,7 +65,7 @@ public class Java8 {
     @Command(value = "cryptography-extension", interceptedBy = DefaultParameters.class)
     public static void cryptographExtension(
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
-                               @Option("environment") final String environment,
+                               @Option("environment") final String inEnvironment,
                                @Option("ssh.") final SshKey sshKey,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -96,40 +96,39 @@ public class Java8 {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            if (env == null) {
-                throw new IllegalArgumentException("No environment " + environment + " for '" + application + "' application");
-            }
-            if (env.getBase() == null) {
-                throw new IllegalArgumentException("No base for environment " + environment + " for '" + application + "' application");
-            }
-
-            env.getHosts().forEach(host -> {
-                out.println("Deploying jce 8 on " + host + " for java " + version);
-
-                try (final Ssh ssh = new Ssh(
-                    // recreate a ssh key using global config
-                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
-                    Substitutors.resolveWithVariables(
-                        ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                        env.getProperties(),
-                        app.getProperties()
-                    ))) {
-
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                    final String remoteWorkDir = fixedBase + "work-provisioning/";
-                    final String target = remoteWorkDir + destination.getName();
-                    final String securityFolder = fixedBase + "java/jdk-" + version + "/jre/lib/security/";
-                    final String extractDir = remoteWorkDir + "/" + workDir.getName() + '/';
-                    ssh.exec(String.format("mkdir -p \"%s\"", remoteWorkDir))
-                        .scp(destination, target, new ProgressBar(out, "Installing JCE on " + host))
-                        .exec(String.format("unzip \"%s\" -d \"%s\"", target, extractDir));
-                    asList("US_export_policy.jar", "local_policy.jar")
-                        .forEach(jar -> ssh.exec(String.format("cp \"%s\" \"%s\"", extractDir + "UnlimitedJCEPolicyJDK8/US_export_policy.jar", securityFolder + jar)));
-                    ssh.exec(String.format("rm -Rf \"%s\" \"%s\"", target, extractDir));
-
-                    out.println("JCE 8 setup in " + securityFolder + " for host " + host);
+            app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                final Deployments.Environment env = contextualEnvironment.getEnvironment();
+                if (env.getBase() == null) {
+                    throw new IllegalArgumentException("No base for environment " + contextualEnvironment.getName() + " for '" + application + "' application");
                 }
+
+                env.getHosts().forEach(host -> {
+                    out.println("Deploying jce 8 on " + host + " for java " + version);
+
+                    try (final Ssh ssh = new Ssh(
+                        // recreate a ssh key using global config
+                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                        Substitutors.resolveWithVariables(
+                            ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                            env.getProperties(),
+                            app.getProperties()
+                        ))) {
+
+                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                        final String remoteWorkDir = fixedBase + "work-provisioning/";
+                        final String target = remoteWorkDir + destination.getName();
+                        final String securityFolder = fixedBase + "java/jdk-" + version + "/jre/lib/security/";
+                        final String extractDir = remoteWorkDir + "/" + workDir.getName() + '/';
+                        ssh.exec(String.format("mkdir -p \"%s\"", remoteWorkDir))
+                            .scp(destination, target, new ProgressBar(out, "Installing JCE on " + host))
+                            .exec(String.format("unzip \"%s\" -d \"%s\"", target, extractDir));
+                        asList("US_export_policy.jar", "local_policy.jar")
+                            .forEach(jar -> ssh.exec(String.format("cp \"%s\" \"%s\"", extractDir + "UnlimitedJCEPolicyJDK8/US_export_policy.jar", securityFolder + jar)));
+                        ssh.exec(String.format("rm -Rf \"%s\" \"%s\"", target, extractDir));
+
+                        out.println("JCE 8 setup in " + securityFolder + " for host " + host);
+                    }
+                });
             });
         }
     }
@@ -138,7 +137,7 @@ public class Java8 {
     public static void install(@Option("architecture") @Default("linux-x64") final String architecture,
                                @Option("extension") @Default("tar.gz") final String extension,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
-                               @Option("environment") final String environment,
+                               @Option("environment") final String inEnvironment,
                                @Option("ssh.") final SshKey sshKey,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -220,37 +219,36 @@ public class Java8 {
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);
-            final Deployments.Environment env = app.findEnvironment(environment);
-            if (env == null) {
-                throw new IllegalArgumentException("No environment " + environment + " for '" + application + "' application");
-            }
-            if (env.getBase() == null) {
-                throw new IllegalArgumentException("No base for environment " + environment + " for '" + application + "' application");
-            }
-
-            env.getHosts().forEach(host -> {
-                out.println("Deploying jdk " + version + " on " + host);
-
-                try (final Ssh ssh = new Ssh(
-                    // recreate a ssh key using global config
-                    new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
-                    Substitutors.resolveWithVariables(
-                        ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                        env.getProperties(),
-                        app.getProperties()
-                    ))) {
-
-                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                    final String remoteWorkDir = fixedBase + "work-provisioning/";
-                    final String target = remoteWorkDir + jdkDestination.getName();
-                    final String jdkTargetFolder = fixedBase + "java/jdk-" + version + '/';
-                    ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, jdkTargetFolder))
-                        .scp(jdkDestination, target, new ProgressBar(out, "Installing JDK on " + host))
-                        .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, jdkTargetFolder))
-                        .exec(String.format("rm \"%s\"", target));
-
-                    out.println("JDK setup in " + jdkTargetFolder + " for host " + host);
+            app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
+                final Deployments.Environment env = contextualEnvironment.getEnvironment();
+                if (env.getBase() == null) {
+                    throw new IllegalArgumentException("No base for environment " + contextualEnvironment.getName() + " for '" + application + "' application");
                 }
+
+                env.getHosts().forEach(host -> {
+                    out.println("Deploying jdk " + version + " on " + host);
+
+                    try (final Ssh ssh = new Ssh(
+                        // recreate a ssh key using global config
+                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                        Substitutors.resolveWithVariables(
+                            ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                            env.getProperties(),
+                            app.getProperties()
+                        ))) {
+
+                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                        final String remoteWorkDir = fixedBase + "work-provisioning/";
+                        final String target = remoteWorkDir + jdkDestination.getName();
+                        final String jdkTargetFolder = fixedBase + "java/jdk-" + version + '/';
+                        ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, jdkTargetFolder))
+                            .scp(jdkDestination, target, new ProgressBar(out, "Installing JDK on " + host))
+                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, jdkTargetFolder))
+                            .exec(String.format("rm \"%s\"", target));
+
+                        out.println("JDK setup in " + jdkTargetFolder + " for host " + host);
+                    }
+                });
             });
         }
     }

@@ -1,0 +1,47 @@
+= CDI Integration
+:jbake-type: page
+:jbake-status: published
+Romain Manni-Bucau
+2015-12-08
+
+To make it easy to reuse TSM metadata, `com.tomitribe.tsm:tsm-cdi:${tsm.version}` provides
+a default CDI producer allowing you to get injected most of metadata:
+
+[source,java]
+----
+@Inject
+@Tsm(Tsm.Key.HOST)
+private String host;
+
+@Inject
+@Tsm(Tsm.Key.ENVIRONMENT)
+private String env;
+
+@Inject
+@Tsm(Tsm.Key.GROUPID)
+private String group;
+
+@Inject
+@Tsm(Tsm.Key.ARTIFACTID)
+private String artifact;
+
+@Inject
+@Tsm(Tsm.Key.VERSION)
+private String version;
+
+@Inject
+@Tsm(Tsm.Key.BRANCH)
+private String branch;
+
+@Inject
+@Tsm(Tsm.Key.REVISION)
+private String rev;
+
+@Inject
+@Tsm(Tsm.Key.SERVER)
+private String server;
+
+@Inject
+@Tsm(Tsm.Key.JAVA)
+private String java;
+----

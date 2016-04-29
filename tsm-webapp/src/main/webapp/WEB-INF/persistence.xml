@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tomitribe Confidential
+
+  Copyright Tomitribe Corporation. 2015
+
+  The source code for this program is not published or otherwise divested
+  of its trade secrets, irrespective of what has been deposited with the
+  U.S. Copyright Office.
+-->
+<persistence version="2.0"
+             xmlns="http://java.sun.com/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://java.sun.com/xml/ns/persistence
+                       http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd">
+  <persistence-unit name="tsm">
+    <jta-data-source>jdbc/tsm</jta-data-source>
+    <non-jta-data-source>jdbc/tsmNonJta</non-jta-data-source>
+    <properties>
+      <property name="openejb.jpa.auto-scan" value="true"/>
+      <property name="openejb.jpa.init-entitymanager" value="true"/>
+      <property name="openjpa.jdbc.SynchronizeMappings" value="buildSchema(ForeignKeys=true)"/>
+    </properties>
+  </persistence-unit>
+</persistence>
