@@ -42,4 +42,14 @@ done
 #
 echo -e "Using tsm.home=$TSM_HOME | java=$JAVA_PATH\n"
 
+
+cygwin=false
+case "`uname`" in
+  CYGWIN*) cygwin=true;;
+esac
+if $cygwin; then
+  [ -n "$JAVA_HOME" ] && JAVA_HOME=`cygpath --absolute --windows "$JAVA_HOME"`
+  tsm_classpath=`cygpath --path --windows "$tsm_classpath"`
+fi
+
 "$JAVA_PATH" "-Dtsm.home=$TSM_HOME $JAVA_OPTS" -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@
