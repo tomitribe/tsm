@@ -199,6 +199,7 @@ public class Application {
                             }
                             ssh.scp(file, finalFilePath, new ProgressBar(out, "Uploading " + file.getName()));
                         });
+                        Stream.of("bin/startup", "bin/shutdown").filter(libs::containsKey).forEach(k -> ssh.exec(String.format("chmod +x \"%s/%s\"", target, k)));
                         ssh.exec(String.format("rm \"%s\"", target));
 
                         out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
