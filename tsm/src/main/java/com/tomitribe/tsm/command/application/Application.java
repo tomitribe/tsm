@@ -77,7 +77,7 @@ import static lombok.AccessLevel.PRIVATE;
 @NoArgsConstructor(access = PRIVATE)
 public class Application {
     private static final JsonReaderFactory READER_FACTORY = Json.createReaderFactory(
-        Collections.singletonMap("org.apache.johnzon.supports-comments", "true"));
+            Collections.singletonMap("org.apache.johnzon.supports-comments", "true"));
 
     @Command(interceptedBy = DefaultParameters.class)
     public static void start(@Option("environment") final String environment,
@@ -90,8 +90,8 @@ public class Application {
                              @Out final PrintStream out,
                              final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
-            "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
+                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -105,8 +105,8 @@ public class Application {
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
-            "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
+                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -120,8 +120,8 @@ public class Application {
                                @Out final PrintStream out,
                                final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
-            "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
+                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
     @Command(interceptedBy = DefaultParameters.class)
@@ -135,17 +135,18 @@ public class Application {
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-            environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup,
-            "Testing %s on %s for environment %s", e -> {
-                final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
-                return new String[]{ // GET is often in PCI zones but not curl so try it first
-                    String.format("GET %s 2>&1 | grep -v 'command not found' || curl -v %s", url, url)
-                };
-            }, crestEnv);
+                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup,
+                "Testing %s on %s for environment %s", e -> {
+                    final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
+                    return new String[]{ // GET is often in PCI zones but not curl so try it first
+                            String.format("GET %s 2>&1 | grep -v 'command not found' || curl -v %s", url, url)
+                    };
+                }, crestEnv);
     }
 
     @Command(value = "install-tar.gz", interceptedBy = DefaultParameters.class)
-    public static void installTarGzArtifact(@Option("environment") final String inEnvironment,
+    public static void installTarGzArtifact(@Option("lib.") final Nexus nexusLib,
+                                            @Option("environment") final String inEnvironment,
                                             @Option("ssh.") final SshKey sshKey,
                                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                             final GitConfiguration git,
@@ -179,15 +180,26 @@ public class Application {
                 env.getHosts().forEach(host -> {
                     out.println("Installing " + segments[1] + " to " + host);
 
+                    final Map<String, File> libs = ofNullable(env.getCustomLibs()).orElse(emptyMap()).entrySet().stream()
+                            .collect(toMap(Map.Entry::getKey, e -> findLib(nexus, nexusLib, out, workDir, e.getValue())));
+
+                    final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
+                    final String remoteWorkDir = fixedBase + "work-provisioning/";
+                    final String target = remoteWorkDir + tarGz.getName();
+                    final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
-                        final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
-                        final String remoteWorkDir = fixedBase + "work-provisioning/";
-                        final String target = remoteWorkDir + tarGz.getName();
-                        final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
-                            .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
-                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
-                            .exec(String.format("rm \"%s\"", target));
+                                .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
+                                .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder));
+                        libs.forEach((lib, file) -> {
+                            final String finalFilePath = targetFolder + lib;
+                            final int dirSep = finalFilePath.lastIndexOf('/');
+                            if (dirSep > 0) {
+                                ssh.exec("mkdir -p \"" + finalFilePath.substring(0, dirSep) + "\"");
+                            }
+                            ssh.scp(file, finalFilePath, new ProgressBar(out, "Uploading " + file.getName()));
+                        });
+                        ssh.exec(String.format("rm \"%s\"", target));
 
                         out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
                     }
@@ -222,27 +234,57 @@ public class Application {
 
     @Command(value = "update-config", interceptedBy = DefaultParameters.class)
     public static void updateConfig(final GitConfiguration git,
-                                         final LocalFileRepository localFileRepository,
-                                         @Option("ssh.") final SshKey sshKey,
-                                         @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
-                                         @Option("tomee-version") final String tomeeVersion,
-                                         @Option("tribestream-version") final String tribestreamVersion,
-                                         @Option("java-version") final String javaVersion,
-                                         @Option("environment") final String environment,
-                                         final String artifactId,
-                                         @Option("node-index") @Default("-1") final int nodeIndex,
-                                         @Option("node-grouping-size") @Default("-1") final int nodeGroup,
-                                         @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
-                                         @Option("as-service") final boolean asService,
-                                         @Option("restart") @Default("false") final boolean restart,
-                                         @Out final PrintStream out,
-                                         @Out final PrintStream err,
-                                         final Environment crestEnv,
-                                         final GlobalConfiguration configuration) throws IOException {
+                                    final LocalFileRepository localFileRepository,
+                                    @Option("ssh.") final SshKey sshKey,
+                                    @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                    @Option("tomee-version") final String tomeeVersion,
+                                    @Option("tribestream-version") final String tribestreamVersion,
+                                    @Option("java-version") final String javaVersion,
+                                    @Option("environment") final String environment,
+                                    final String artifactId,
+                                    @Option("node-index") @Default("-1") final int nodeIndex,
+                                    @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                                    @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
+                                    @Option("as-service") final boolean asService,
+                                    @Option("restart") @Default("false") final boolean restart,
+                                    @Out final PrintStream out,
+                                    @Out final PrintStream err,
+                                    final Environment crestEnv,
+                                    final GlobalConfiguration configuration) throws IOException {
         install(
-            null, null, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
-            null, artifactId, null, // see install() for details
-            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                null, null, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
+                null, artifactId, null, // see install() for details
+                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+    }
+
+    private static File download(final Nexus nexus, final LocalFileRepository localFileRepository,
+                                 final PrintStream out, final String appWorkName,
+                                 final File workDir,
+                                 final String artifactId, final String groupId, final String version, final String type) {
+        if (nexus != null) {
+            if (groupId == null && version == null) {
+                out.println("configuration only, skipping artifacts");
+                return null;
+            }
+
+            final File downloadedFile = new File(workDir, appWorkName + "_" + version + "." + type);
+            if (!downloadedFile.isFile()) {
+                final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, type);
+                if (cacheFile.isFile()) {
+                    out.println("Using locally cached " + artifactId + '.');
+                    try {
+                        IO.copy(cacheFile, downloadedFile);
+                    } catch (final IOException e) {
+                        throw new IllegalStateException(e);
+                    }
+                } else {
+                    out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
+                    nexus.download(out, groupId, artifactId, version, null, type).to(downloadedFile);
+                }
+            }
+            return downloadedFile;
+        }
+        return null;
     }
 
     @Command(value = "config-only", interceptedBy = DefaultParameters.class)
@@ -267,9 +309,9 @@ public class Application {
                                          final Environment crestEnv,
                                          final GlobalConfiguration configuration) throws IOException {
         install(
-            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
-            null, artifactId, null, // see install() for details
-            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
+                null, artifactId, null, // see install() for details
+                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
     }
 
     // same as install but without groupId/artifactId (read from deployments.json)
@@ -296,9 +338,9 @@ public class Application {
                                     final Environment crestEnv,
                                     final GlobalConfiguration configuration) throws IOException {
         install(
-            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
-            null, artifactId, null, // see install() for details
-            nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
+                null, artifactId, null, // see install() for details
+                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
     }
 
     // meta command reading tsm-metadata.json to set git, server, env, app and java config
@@ -363,9 +405,9 @@ public class Application {
         }
 
         install(
-            nexus, nexusLib, git, localFileRepository, sshKey, workDirBase,
-            tomee, tribestream, java, environment, groupId, artifactId, version,
-            nodeIndex, nodeGroup, pause, false, restart, out, err, crestEnv, configuration);
+                nexus, nexusLib, git, localFileRepository, sshKey, workDirBase,
+                tomee, tribestream, java, environment, groupId, artifactId, version,
+                nodeIndex, nodeGroup, pause, false, restart, out, err, crestEnv, configuration);
     }
 
     // this is the master logic for all deployments (application, config only etc...)
@@ -416,31 +458,7 @@ public class Application {
                 final String groupId = ofNullable(inGroupId).orElse(env.getGroupId());
                 final String version = ofNullable(inVersion).orElse(env.getVersion());
 
-                final File downloadedFile;
-                if (nexus != null) {
-                    if (groupId == null && version == null) {
-                        downloadedFile = null;
-                        out.println("configuration only, skipping artifacts");
-                    } else {
-                        downloadedFile = new File(workDir, appWorkName + "_" + version + ".war");
-                        if (!downloadedFile.isFile()) {
-                            final File cacheFile = localFileRepository.find(groupId, artifactId, version, null, "war");
-                            if (cacheFile.isFile()) {
-                                out.println("Using locally cached " + artifactId + '.');
-                                try {
-                                    IO.copy(cacheFile, downloadedFile);
-                                } catch (final IOException e) {
-                                    throw new IllegalStateException(e);
-                                }
-                            } else {
-                                out.println("Didn't find cached " + artifactId + " in " + cacheFile + " so trying to download it for this provisioning.");
-                                nexus.download(out, groupId, artifactId, version, null, "war").to(downloadedFile);
-                            }
-                        }
-                    }
-                } else {
-                    downloadedFile = null;
-                }
+                final File downloadedFile = download(nexus, localFileRepository, out, appWorkName, workDir, artifactId, groupId, version, "war");
 
                 final Collection<File> additionalLibs = new LinkedList<>();
                 final Map<String, File> additionalCustomLibs = new TreeMap<>();
@@ -469,13 +487,13 @@ public class Application {
                 }
 
                 final AtomicReference<String> chosenServerVersion = new AtomicReference<>(
-                    tribestreamVersion != null ? "tribestream-" + tribestreamVersion :
-                        (tomeeVersion != null ? "apache-tomee-" + tomeeVersion : null));
+                        tribestreamVersion != null ? "tribestream-" + tribestreamVersion :
+                                (tomeeVersion != null ? "apache-tomee-" + tomeeVersion : null));
 
                 final AtomicReference<String> chosenJavaVersion = new AtomicReference<>(javaVersion == null ? null : "jdk-" + javaVersion);
 
                 final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
-                    .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+                        .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
                 final AtomicInteger currentIdx = new AtomicInteger();
                 reInitFiltering.set(true);
                 final NodeSelector selector = new NodeSelector(nodeIndex, nodeGroup);
@@ -499,9 +517,9 @@ public class Application {
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         // get tribestream version or just ask the user for it listing the ones the server has
                         ofNullable(chosenServerVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, serverBase, true, chosenServerVersion, "tribestream", "apache-tomee"));
+                                .orElseGet(() -> readVersion(out, err, ssh, serverBase, true, chosenServerVersion, "tribestream", "apache-tomee"));
                         ofNullable(chosenJavaVersion.get())
-                            .orElseGet(() -> readVersion(out, err, ssh, javaBase, false, chosenJavaVersion, "jdk"));
+                                .orElseGet(() -> readVersion(out, err, ssh, javaBase, false, chosenJavaVersion, "jdk"));
 
                         // shutdown if running
                         ssh.exec("[ -f \"" + serverShutdownCmd + "\" ] && \"" + serverShutdownCmd + "\" 1200 -force");
@@ -511,14 +529,14 @@ public class Application {
                         }
                         // create the structure if needed
                         ssh.exec(String.format("mkdir -p \"%s\"", targetFolder))
-                            // create app structure
-                            .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done");
+                                // create app structure
+                                .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done");
 
                         if (downloadedFile != null) {
                             ssh.scp(
-                                downloadedFile,
-                                targetFolder + "webapps/" + env.getDeployerProperties().getOrDefault("application.context", artifactId) + ".war",
-                                new ProgressBar(out, "Uploading " + artifactId + " on " + host));
+                                    downloadedFile,
+                                    targetFolder + "webapps/" + env.getDeployerProperties().getOrDefault("application.context", artifactId) + ".war",
+                                    new ProgressBar(out, "Uploading " + artifactId + " on " + host));
                         }
 
                         // uploading libs
@@ -551,13 +569,13 @@ public class Application {
                         Collections.reverse(foldersToSyncs);
 
                         final String serverFolder = chosenServerVersion.get().startsWith("apache-tomee") ? "apache-tomee" :
-                            (chosenServerVersion.get().startsWith("tribestream-access-gateway") ? "tribestream-access-gateway" : "tribestream");
+                                (chosenServerVersion.get().startsWith("tribestream-access-gateway") ? "tribestream-access-gateway" : "tribestream");
                         final String envrt =
-                            "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
-                            "export CATALINA_HOME=\"" + serverBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
-                            "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
-                            ofNullable(env.getClasspath()).map(cp -> "export CLASSPATH=\"" + cp + "\"\n").orElse("") + // set the classpath after CATALINA_ to let reuse them
-                            "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
+                                "export JAVA_HOME=\"" + javaBase + chosenJavaVersion.get() + "\"\n" +
+                                        "export CATALINA_HOME=\"" + serverBase + serverFolder + "/" + chosenServerVersion.get() + "\"\n" +
+                                        "export CATALINA_BASE=\"" + targetFolder + "\"\n" +
+                                        ofNullable(env.getClasspath()).map(cp -> "export CLASSPATH=\"" + cp + "\"\n").orElse("") + // set the classpath after CATALINA_ to let reuse them
+                                        "export CATALINA_PID=\"" + targetFolder + "work/" + serverFolder.replace("apache-", "") + ".pid" + "\"\n";
 
                         {   // setenv needs some more love to get a proper env setup
                             final File setEnv = new File(workDir, "setenv.sh");
@@ -601,40 +619,40 @@ public class Application {
 
                         // now we will add few script/files for easiness but these ones are "nice to have" and not "must have"
                         final String scriptTop =
-                            "#! /bin/bash\n" +
-                                "\n" +
-                                "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
-                                "source \"$proc_script_base/bin/setenv.sh\"\n";
+                                "#! /bin/bash\n" +
+                                        "\n" +
+                                        "proc_script_base=\"`cd $(dirname $0) && cd .. && pwd`\"\n" +
+                                        "source \"$proc_script_base/bin/setenv.sh\"\n";
                         addScript(
-                            reInitFiltering.get(),
-                            out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
-                            scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
+                                reInitFiltering.get(),
+                                out, ssh, foldersToSyncs, workDir, targetFolder, "processes",
+                                scriptTop + "ps aux | grep \"$proc_script_base\" | grep -v grep\n\n");
                         addScript(
-                            reInitFiltering.get(),
-                            out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
-                            scriptTop +
-                                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                                "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
-                                "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
-                                "\n");
+                                reInitFiltering.get(),
+                                out, ssh, foldersToSyncs, workDir, targetFolder, "startup",
+                                scriptTop +
+                                        "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                                        "nohup \"$CATALINA_HOME/bin/startup.sh\" \"$@\" > $proc_script_base/logs/nohup.log &\n" +
+                                        "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
+                                        "\n");
                         addScript(
-                            reInitFiltering.get(),
-                            out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
-                            scriptTop +
-                                "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
-                                "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
-                                "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
-                                "\n");
+                                reInitFiltering.get(),
+                                out, ssh, foldersToSyncs, workDir, targetFolder, "shutdown",
+                                scriptTop +
+                                        "[ -f \"$proc_script_base/bin/pre_shutdown.sh\" ] && \"$proc_script_base/bin/pre_shutdown.sh\"\n" +
+                                        "\"$CATALINA_HOME/bin/shutdown.sh\" \"$@\"\n" +
+                                        "[ -f \"$proc_script_base/bin/post_shutdown.sh\" ] && \"$proc_script_base/bin/post_shutdown.sh\"\n" +
+                                        "\n");
                         addScript(
-                            reInitFiltering.get(),
-                            out, ssh, foldersToSyncs, workDir, targetFolder, "run",
-                            scriptTop +
-                                "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
-                                "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
+                                reInitFiltering.get(),
+                                out, ssh, foldersToSyncs, workDir, targetFolder, "run",
+                                scriptTop +
+                                        "[ -f \"$proc_script_base/bin/pre_startup.sh\" ] && \"$proc_script_base/bin/pre_startup.sh\"\n" +
+                                        "\"$CATALINA_HOME/bin/catalina.sh\" \"run\" \"$@\"\n\n"); // no post_startup since run is blocking
                         addScript(
-                            reInitFiltering.get(),
-                            out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
-                            scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
+                                reInitFiltering.get(),
+                                out, ssh, foldersToSyncs, workDir, targetFolder, "restart",
+                                scriptTop + "\"$proc_script_base/bin/shutdown\" && sleep 3 && \"$proc_script_base/bin/startup\"\n\n");
 
                         {   // just to be able to know what we did and when when browsing manually the installation, we could add much more if needed
                             final File metadata = new File(workDir, "tsm-metadata.json"); // sample usage in com.sbux.pos.basket.configuration.aspconfig.TsmPropertiesProvider
@@ -668,22 +686,22 @@ public class Application {
                         // finally make scripts executable if they were not
                         final List<String> scripts = new ArrayList<>(asList("processes", "startup", "shutdown", "run", "restart"));
                         scripts.addAll(foldersToSyncs.stream().map(f -> new File(f, "/bin"))
-                            .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
-                            .map(File::getName)
-                            .collect(toList()));
+                                .flatMap(f -> asList(ofNullable(f.listFiles(scr -> scr.getName().endsWith(".sh"))).orElse(new File[0])).stream())
+                                .map(File::getName)
+                                .collect(toList()));
                         ssh.exec("chmod ug+rwx " + scripts.stream()
-                            .map(n -> "\"" + targetFolder + "bin/" + n + "\"").collect(joining(" ")));
+                                .map(n -> "\"" + targetFolder + "bin/" + n + "\"").collect(joining(" ")));
 
                         if (asService) { // needs write access in /etc /init.d/and sudo without password
                             final File initD = new File(workDir, "initd");
                             if (reInitFiltering.get() || !initD.isFile()) {
                                 try (final FileWriter writer = new FileWriter(initD)) {
                                     writer.write("" +
-                                        "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
-                                        "# description: handles " + artifactId + "\n" +
-                                        "\n" + envrt + "\n\n" +
-                                        "exec $CATALINA_HOME/bin/catalina.sh $*" +
-                                        "");
+                                            "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
+                                            "# description: handles " + artifactId + "\n" +
+                                            "\n" + envrt + "\n\n" +
+                                            "exec $CATALINA_HOME/bin/catalina.sh $*" +
+                                            "");
                                 } catch (final IOException e) {
                                     throw new IllegalStateException(e);
                                 }
@@ -691,8 +709,8 @@ public class Application {
                             final String script = targetFolder + "bin/init.d.sh";
                             ssh.scp(initD, script, new ProgressBar(out, "Uploading init.d script"));
                             ssh.exec("sudo mv \"" + script + "\" \"/etc/init.d/" + artifactId + "\"")
-                                .exec("sudo chmod ug+rx \"/etc/init.d/" + artifactId + "\"")
-                                .exec("sudo chkconfig --add " + artifactId);
+                                    .exec("sudo chmod ug+rx \"/etc/init.d/" + artifactId + "\"")
+                                    .exec("sudo chkconfig --add " + artifactId);
                         }
 
                         if (!restart) {
@@ -745,7 +763,7 @@ public class Application {
 
     private static String envFolder(final Deployments.Environment environment, final String def) {
         return ofNullable(environment.getProperties().get("tsm.tribestream.folder"))
-            .orElseGet(() -> environment.getDeployerProperties().getOrDefault("tribestream.folder", def));
+                .orElseGet(() -> environment.getDeployerProperties().getOrDefault("tribestream.folder", def));
     }
 
     private static void addScript(final boolean forceInit,
@@ -806,7 +824,7 @@ public class Application {
     private static boolean isFilterable(final File file) {
         final String name = file.getName();
         return name.endsWith(".properties") || name.endsWith(".xml") || name.endsWith(".yaml") || name.endsWith(".yml") || name.endsWith(".json")
-            || name.endsWith(".sh") || name.endsWith(".config");
+                || name.endsWith(".sh") || name.endsWith(".config");
     }
 
     private static String readVersion(final PrintStream out, final PrintStream err,
@@ -818,20 +836,20 @@ public class Application {
         final List<String> names = asList(name);
         final Map<String, List<String>> versionByName = new HashMap<>();
         names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + (useNames ? server + "/\"" : ""))).split("\\n+")).stream()
-            .filter(v -> v != null && v.startsWith(server + '-'))
-            .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
-            .collect(toList()))
-            .filter(v -> !v.isEmpty())
-            .ifPresent(versions -> versionByName.put(server, versions)));
+                .filter(v -> v != null && v.startsWith(server + '-'))
+                .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
+                .collect(toList()))
+                .filter(v -> !v.isEmpty())
+                .ifPresent(versions -> versionByName.put(server, versions)));
 
         if (currentVersion.get() != null &&
-            !versionByName.entrySet().stream()
-                .flatMap(e -> e.getValue().stream().map(v -> e.getKey() + "-" + v))
-                .filter(currentVersion.get()::equals)
-                .findAny().isPresent()) {
+                !versionByName.entrySet().stream()
+                        .flatMap(e -> e.getValue().stream().map(v -> e.getKey() + "-" + v))
+                        .filter(currentVersion.get()::equals)
+                        .findAny().isPresent()) {
             throw new IllegalStateException(
-                "You need " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
-                    "Found: " + versionByName);
+                    "You need " + currentVersion.get() + ", please do it on ALL nodes before provisioning this application." +
+                            "Found: " + versionByName);
         }
         if (!versionByName.values().stream().flatMap(Collection::stream).findAny().isPresent()) {
             throw new IllegalStateException("No " + names + " installed in " + fixedBase + ", please do it before provisioning an application.");
@@ -928,13 +946,13 @@ public class Application {
 
     private static Ssh newSsh(final SshKey sshKey, final String host, final Deployments.Application app, final Deployments.Environment env) {
         return new Ssh(
-            // recreate a ssh key using global config
-            new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
-            Substitutors.resolveWithVariables(
-                ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                env.getProperties(),
-                app.getProperties()
-            ));
+                // recreate a ssh key using global config
+                new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                Substitutors.resolveWithVariables(
+                        ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                        env.getProperties(),
+                        app.getProperties()
+                ));
     }
 
     private static void execute(final String environment,

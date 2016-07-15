@@ -108,6 +108,7 @@ public class ApplicationTest {
 
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         Application.installTarGzArtifact(
+            null,
             "prod",
             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
             new File("target/ApplicationTest-tg-work/"),
