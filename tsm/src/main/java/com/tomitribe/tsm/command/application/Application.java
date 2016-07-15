@@ -168,7 +168,8 @@ public class Application {
             nexus.download(out, segments[0], segments[1], segments[2], segments.length > 3 ? segments[3] : null, "tar.gz").to(tarGz);
         }
 
-        try (final FileReader reader = new FileReader(gitClone(git, artifactId, out, workDir))) {
+        final AtomicReference<File> clone = new AtomicReference<>(gitClone(git, artifactId, out, workDir));
+        try (final FileReader reader = new FileReader(clone.get())) {
             final Deployments.Application app = Deployments.read(reader);
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
                 contextualEnvironment.resetEnvironment();
@@ -187,21 +188,47 @@ public class Application {
                     final String remoteWorkDir = fixedBase + "work-provisioning/";
                     final String target = remoteWorkDir + tarGz.getName();
                     final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
+                    final String additionalBase = fixedBase + artifactId + '/' + inEnvironment + '/';
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
                                 .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
                                 .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder));
                         libs.forEach((lib, file) -> {
-                            final String finalFilePath = targetFolder + lib;
+                            final String finalFilePath = additionalBase + lib;
                             final int dirSep = finalFilePath.lastIndexOf('/');
                             if (dirSep > 0) {
                                 ssh.exec("mkdir -p \"" + finalFilePath.substring(0, dirSep) + "\"");
                             }
                             ssh.scp(file, finalFilePath, new ProgressBar(out, "Uploading " + file.getName()));
                         });
-                        Stream.of("bin/startup", "bin/shutdown").filter(libs::containsKey).forEach(k -> ssh.exec(String.format("chmod +x \"%s/%s\"", target, k)));
+
+                        final List<File> foldersToSyncs = new LinkedList<>();
+                        final String envFolder = envFolder(env, inEnvironment);
+                        final List<String> configFolders = asList(artifactId, artifactId + "-" + envFolder);
+                        configFolders.forEach(folder -> {
+                            final File foldersToSync = new File(clone.get().getParentFile(), folder);
+                            if (foldersToSync.isDirectory()) {
+                                out.println("Synchronizing " + foldersToSync.getName() + " folders");
+                                synch(out, ssh, foldersToSync, foldersToSync, additionalBase, app, env);
+                                foldersToSyncs.add(foldersToSync);
+                            } else {
+                                out.println("No '" + folder + "' configuration folder found.");
+                            }
+                        });
+                        Collections.reverse(foldersToSyncs);
+                        final List<String> files = foldersToSyncs.stream().map(f -> new File(f, "bin"))
+                                .filter(File::isDirectory)
+                                .flatMap(f -> Stream.of(ofNullable(f.listFiles()).orElse(new File[0])))
+                                .map(f -> f.getParentFile().getName() + '/' + f.getName())
+                                .collect(toList());
+                        Stream.of("bin/startup", "bin/shutdown").filter(files::contains).forEach(k -> ssh.exec(String.format("chmod +x \"%s/%s\"", additionalBase, k)));
                         ssh.exec(String.format("rm \"%s\"", target));
 
+                        final File root = clone.get().getParentFile().getParentFile();
+                        final File potentialCopy = git.reset(root, out);
+                        if (potentialCopy != root) {
+                            clone.set(new File(potentialCopy, artifactId + "/deployments.json"));
+                        }
                         out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
                     }
                 });
