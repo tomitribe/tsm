@@ -198,7 +198,7 @@ class ContainerBase {
             urlConnection.setRequestProperty("Authorization", security.getAuthorization());
             final Collection<Artifact> artifacts = new MapperBuilder().setAccessModeName("field").build().readCollection(urlConnection.getInputStream(), new JohnzonParameterizedType(List.class, Artifact.class));
             artifacts.stream()
-                .filter(a -> "ACTIVATED".equals(a.getState()) && a.getSize() > 0 && "tar.gz".equals(a.getType()) && (includeSnapshots || !a.getVersion().contains("SNAPSHOT")))
+                .filter(a -> ("ACTIVATED".equals(a.getState()) || "ARCHIVED".equals(a.getState())) && a.getSize() > 0 && "tar.gz".equals(a.getType()) && (includeSnapshots || !a.getVersion().contains("SNAPSHOT")))
                 .forEach(a -> lists.add(a.getVersion()));
         } finally {
             urlConnection.disconnect();

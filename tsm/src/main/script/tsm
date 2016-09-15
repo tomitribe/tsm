@@ -1,5 +1,10 @@
 #! /bin/bash
 
+cygwin=false
+case "`uname`" in
+  CYGWIN*) cygwin=true;;
+esac
+
 #
 # capture environment setup or default from this script location
 #
@@ -8,6 +13,9 @@ TSM_HOME="${TSM_HOME:-`cd $(dirname $0) && cd .. && pwd`}"
 #
 # capture java path
 #
+if $cygwin; then
+  [ -n "$JAVA_HOME" ] && JAVA_HOME=`cygpath --absolute --windows "$JAVA_HOME"`
+fi
 if [ -z "$JAVA_HOME" -a -z "$JRE_HOME" ]; then
   if $darwin; then
     if [ -x '/usr/libexec/java_home' ] ; then
@@ -41,5 +49,9 @@ done
 # run the app
 #
 echo -e "Using tsm.home=$TSM_HOME | java=$JAVA_PATH\n"
+
+if $cygwin; then
+  tsm_classpath=`cygpath --path --windows "$tsm_classpath"`
+fi
 
 "$JAVA_PATH" "-Dtsm.home=$TSM_HOME $JAVA_OPTS" -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@
