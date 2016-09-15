@@ -454,11 +454,16 @@ public class Application {
 
                         final File local = new File(workDir, segments[1] + ".war");
                         if (!local.isFile()) {
+                            final String gId = segments[0];
+                            final String aId = segments[1];
+                            final String aVersion = segments[2];
+                            final String aType = segments.length >= 4 ? segments[3] : "war";
+                            final String aClassifier = segments.length >= 5 ? segments[4] : null;
                             try {
-                                nexusLib.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                                nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                             } catch (final IllegalStateException ise) {
                                 if (nexus != null) {
-                                    nexus.download(out, segments[0], segments[1], segments[2], null, "war").to(local);
+                                    nexus.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                                 }
                             }
                         }
