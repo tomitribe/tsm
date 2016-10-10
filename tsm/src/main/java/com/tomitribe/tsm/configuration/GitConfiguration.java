@@ -38,10 +38,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -169,7 +165,7 @@ public class GitConfiguration {
 
             @Override
             protected JSch createDefaultJSch(final FS fs) throws JSchException {
-                final JSch jSch = super.createDefaultJSch(fs);
+                final JSch jSch = new JSch(); // don't call super otherwise you can inherit from keys you don't want
                 if (consumer != null) {
                     consumer.accept(jSch);
                 }
