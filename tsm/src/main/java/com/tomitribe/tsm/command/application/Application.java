@@ -63,6 +63,7 @@ import java.util.stream.Stream;
 
 import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
 import static java.util.Arrays.asList;
+import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -178,8 +179,13 @@ public class Application {
 
                 final Deployments.Environment env = contextualEnvironment.getEnvironment();
 
+                final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getByHostProperties()).orElse(emptyMap())
+                        .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+
                 env.getHosts().forEach(host -> {
                     out.println("Installing " + segments[1] + " to " + host);
+
+                    byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
 
                     final Map<String, File> libs = ofNullable(env.getCustomLibs()).orElse(emptyMap()).entrySet().stream()
                             .collect(toMap(Map.Entry::getKey, e -> findLib(nexus, nexusLib, out, workDir, e.getValue())));
@@ -816,7 +822,7 @@ public class Application {
     }
 
     private static Stream<File> childrenStream(final File foldersToSync) {
-        return asList(ofNullable(foldersToSync.listFiles(n -> !n.getName().startsWith("."))).orElse(new File[0])).stream();
+        return stream(ofNullable(foldersToSync.listFiles(n -> !n.getName().startsWith("."))).orElse(new File[0]));
     }
 
     private static void synch(final PrintStream out, final Ssh ssh, final File foldersToSync, final File file, final String targetFolder,

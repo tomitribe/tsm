@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static java.util.Arrays.asList;
+import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
@@ -51,7 +51,7 @@ public interface Deployments {
                                 .map(n -> new ContextualEnvironment(n, e)).collect(toList()).stream()
                     ).collect(toList());
             }
-            return asList(inEnvironment.split(" *, *")).stream().map(environment -> {
+            return stream(inEnvironment.split(" *, *")).map(environment -> {
                 final Environment reduce = ofNullable(environments).orElse(emptyList()).stream()
                     .filter(e -> ofNullable(e.getNames()).orElse(emptyList()).contains(environment))
                     .reduce(null, (a, b) -> {
