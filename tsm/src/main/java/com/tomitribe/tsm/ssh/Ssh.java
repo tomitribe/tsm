@@ -94,7 +94,7 @@ public final class Ssh implements AutoCloseable {
                 }
 
                 of(out.toByteArray()).map(String::new).filter(s -> !s.isEmpty())
-                    .ifPresent(Environment.ENVIRONMENT_THREAD_LOCAL.get().getOutput()::println);
+                        .ifPresent(Environment.ENVIRONMENT_THREAD_LOCAL.get().getOutput()::println);
             } catch (final IOException e) {
                 // no-op
             }
@@ -128,17 +128,41 @@ public final class Ssh implements AutoCloseable {
             final byte[] buf = new byte[1024];
             long totalLength = 0;
 
-            try (final FileInputStream fis = new FileInputStream(file)) {
+            final boolean autoThrottling = filesize > (1024 * 1024); // TODO: find another detection mode probably
+            final Consumer<Double> throttler = autoThrottling ? pc -> new Consumer<Double>() {
+                private long last = System.currentTimeMillis();
+
+                @Override
+                public void accept(final Double val) {
+                    final long now = System.currentTimeMillis();
+                    if (now - last > 2000 /*2s*/) { // each 2s pause a bit (75ms)
+                        try {
+                            Thread.sleep(75);
+                        } catch (final InterruptedException e) {
+                            Thread.interrupted();
+                            throw new IllegalStateException(e);
+                        }
+                        last = now;
+                    }
+                }
+            } : null;
+            final Consumer<Double> decoratedProgressTracker = autoThrottling ?
+                    (progressTracker == null ? throttler : (pc -> {
+                        progressTracker.accept(pc);
+                        throttler.accept(pc);
+                    })) : progressTracker;
+            try (final InputStream fis = new FileInputStream(file)) {
                 while (true) {
                     int len = fis.read(buf, 0, buf.length);
                     if (len < 0) {
                         break;
                     }
+
                     out.write(buf, 0, len);
                     totalLength += len;
 
-                    if (progressTracker != null) {
-                        progressTracker.accept(totalLength * 100. / filesize);
+                    if (decoratedProgressTracker != null) {
+                        decoratedProgressTracker.accept(totalLength * 100. / filesize);
                     }
                 }
             }
