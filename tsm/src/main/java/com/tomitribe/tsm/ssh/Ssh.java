@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static java.util.Optional.of;
@@ -69,8 +70,27 @@ public final class Ssh implements AutoCloseable {
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
                 final byte[] buffer = new byte[1024];
                 int length;
-                while (channel.isConnected() && (length = inputStream.read(buffer)) != -1) {
-                    out.write(buffer, 0, length);
+                long retryUntil = -1;
+                while (channel.isConnected()) {
+                    // ensure to check available cause read() is blocking
+                    final int available = inputStream.available();
+                    if (available > 0 && (length = inputStream.read(buffer, 0, Math.min(buffer.length, available))) != -1) {
+                        out.write(buffer, 0, length);
+                    } else {
+                        if (channel.getExitStatus() != -1) { // process is over
+                            if (retryUntil < 0) {
+                                retryUntil = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(3) /*config?*/;
+                            } else if (System.currentTimeMillis() - retryUntil >= 0) {
+                                break;
+                            }
+                        }
+                        try {
+                            Thread.sleep(250);
+                        } catch (final InterruptedException e) {
+                            Thread.interrupted();
+                            break;
+                        }
+                    }
                 }
 
                 of(out.toByteArray()).map(String::new).filter(s -> !s.isEmpty())
