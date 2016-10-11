@@ -128,7 +128,7 @@ public final class Ssh implements AutoCloseable {
             final byte[] buf = new byte[1024];
             long totalLength = 0;
 
-            final boolean autoThrottling = filesize > (1024 * 1024); // TODO: find another detection mode probably
+            final boolean autoThrottling = !Boolean.getBoolean("tsm.ssh.throttling.disabled") && filesize > (1024 * 1024);
             final Consumer<Double> throttler = autoThrottling ? pc -> new Consumer<Double>() {
                 private long last = System.currentTimeMillis();
 
