@@ -128,16 +128,19 @@ public final class Ssh implements AutoCloseable {
             final byte[] buf = new byte[1024];
             long totalLength = 0;
 
+            // these are not yet wired to the CLI cause experimental config, can be set in $JAVA_OPTS
             final boolean autoThrottling = !Boolean.getBoolean("tsm.ssh.throttling.disabled") && filesize > (1024 * 1024);
             final Consumer<Double> throttler = autoThrottling ? pc -> new Consumer<Double>() {
                 private long last = System.currentTimeMillis();
+                private long period = Long.getLong("tsm.ssh.throttling.period", 1000);
+                private long pause = Long.getLong("tsm.ssh.throttling.pause", 150);
 
                 @Override
                 public void accept(final Double val) {
                     final long now = System.currentTimeMillis();
-                    if (now - last > 2000 /*2s*/) { // each 2s pause a bit (75ms)
+                    if (now - last > period) {
                         try {
-                            Thread.sleep(75);
+                            Thread.sleep(pause);
                         } catch (final InterruptedException e) {
                             Thread.interrupted();
                             throw new IllegalStateException(e);
