@@ -638,7 +638,8 @@ public class Application {
                                                 appender.accept(content);
                                                 jobDone = true;
                                             }
-                                            content.append(line).append('\n');
+                                            final String substituted = Substitutors.resolveWithVariables(line, env.getProperties(), app.getProperties());
+                                            content.append(substituted).append('\n');
                                         }
                                     } catch (final IOException e) {
                                         throw new IllegalStateException(e);
