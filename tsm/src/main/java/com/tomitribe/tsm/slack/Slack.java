@@ -14,6 +14,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.johnzon.mapper.JohnzonProperty;
 import org.apache.johnzon.mapper.Mapper;
 import org.apache.johnzon.mapper.MapperBuilder;
@@ -25,8 +27,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.function.Function;
 
 import static java.util.Optional.ofNullable;
@@ -34,7 +36,7 @@ import static javax.xml.bind.DatatypeConverter.printBase64Binary;
 
 @RequiredArgsConstructor
 public class Slack implements Listeners.Listener {
-    private final Mapper mapper = new MapperBuilder().build();
+    private final Mapper mapper = new MapperBuilder().setAccessModeName("field").build();
 
     @Override
     public void sendMessage(final Function<String, String> reader, final String message) {
@@ -79,8 +81,11 @@ public class Slack implements Listeners.Listener {
                 connection.connect();
 
                 try (final OutputStream os = connection.getOutputStream()) {
-                    final String json = mapper.writeObjectAsString(new Message(emoji, channel.startsWith("#") ? channel : ('#' + channel), message));
-                    os.write(("payload=" + URLEncoder.encode(json, "UTF-8")).getBytes(StandardCharsets.UTF_8));
+                    final String json = mapper.writeObjectAsString(new Message(
+                            emoji, "TSM",
+                            channel.startsWith("#") || channel.startsWith("@") ? channel : ('#' + channel),
+                            message));
+                    os.write(URLEncodedUtils.format(Collections.singletonList(new BasicNameValuePair("payload", json)), StandardCharsets.UTF_8).getBytes(StandardCharsets.UTF_8));
                 }
 
                 try (final InputStream in = connection.getInputStream()) { // read response to not split too early
@@ -109,6 +114,7 @@ public class Slack implements Listeners.Listener {
     public static class Message {
         @JohnzonProperty("icon_emoji")
         private String emoji;
+        private String username;
         private String channel;
         private String text;
     }
