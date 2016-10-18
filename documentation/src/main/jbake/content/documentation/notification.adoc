@@ -1,0 +1,25 @@
+= Notifications
+:jbake-type: page
+:jbake-status: published
+Romain Manni-Bucau
+2016-10-18
+
+TSM supports some basic client notifications. For now it is mainly Slack integration.
+
+Configuration is as follow:
+
+TIP: if no artifactid is set then the configuration is global for all deployments but if you set it as suffix then
+it is specific to a single deployment. Ex: `slack.active.mydeployment = false`.
+
+[headers="*"]
+|====
+|Name|Description
+|slack.active|a boolean to activate the notification
+|slack.endpoint|the slack webhook url
+|slack.emoji|the emoji to use
+|slack.channel|the target channel
+|slack.timeout|HTTP timeout for the communication
+|slack.auth.type|Basic or nothing
+|slack.auth.user|if type is set to basic the username
+|slack.auth.password|if type is set to basic the password
+|====

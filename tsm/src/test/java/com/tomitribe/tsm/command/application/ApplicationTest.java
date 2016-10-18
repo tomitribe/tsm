@@ -16,8 +16,13 @@ import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.Nexus;
 import com.tomitribe.tsm.configuration.SshKey;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
+import com.tomitribe.tsm.listener.Listeners;
+import com.tomitribe.tsm.listener.MemListener;
 import org.junit.Rule;
 import org.junit.Test;
+import org.tomitribe.crest.api.interceptor.CrestContext;
+import org.tomitribe.crest.api.interceptor.ParameterMetadata;
 import org.tomitribe.crest.environments.Environment;
 import org.tomitribe.crest.environments.SystemEnvironment;
 import org.tomitribe.util.Duration;
@@ -27,8 +32,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
@@ -139,46 +149,92 @@ public class ApplicationTest {
     }
 
     @Test
-    public void install() throws IOException {
+    public void install() throws Throwable {
+        MemListener.MESSAGES.clear();
         git.addFile("art/tribestream/conf/someconf.properties", "e=${tsm.environment}").addDeploymentsJson("art");
 
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final ByteArrayOutputStream err = new ByteArrayOutputStream();
-        Application.install(
-            new Nexus("http://faked", null, null) {
-                @Override
-                public DownloadHandler download(final PrintStream out,
-                                                final String groupId, final String artifactId, final String version,
-                                                final String classifier, final String type) {
-                    return destination -> {
-                        try {
-                            IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
-                        } catch (final IOException e) {
-                            fail(e.getMessage());
-                        }
-                    };
+        final CrestContext ctx = new CrestContext() {
+            @Override
+            public Object proceed() {
+                try {
+                    Application.install(
+                            new Nexus("http://faked", null, null) {
+                                @Override
+                                public DownloadHandler download(final PrintStream out,
+                                                                final String groupId, final String artifactId, final String version,
+                                                                final String classifier, final String type) {
+                                    return destination -> {
+                                        try {
+                                            IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                                        } catch (final IOException e) {
+                                            fail(e.getMessage());
+                                        }
+                                    };
+                                }
+                            },
+                            new Nexus("http://faked", null, null) {
+                                @Override
+                                public DownloadHandler download(final PrintStream out,
+                                                                final String groupId, final String artifactId, final String version,
+                                                                final String classifier, final String type) {
+                                    return destination -> {
+                                        try {
+                                            IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                                        } catch (final IOException e) {
+                                            fail(e.getMessage());
+                                        }
+                                    };
+                                }
+                            },
+                            new GitConfiguration(git.directory(), "ApplicationTest-install", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+                            new LocalFileRepository(new File("target/missing")),
+                            new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+                            new File("target/ApplicationTest-install-work/"),
+                            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
+                            new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
+                } catch (final IOException e) {
+                    throw new IllegalStateException(e);
                 }
-            },
-            new Nexus("http://faked", null, null) {
-                @Override
-                public DownloadHandler download(final PrintStream out,
-                                                final String groupId, final String artifactId, final String version,
-                                                final String classifier, final String type) {
-                    return destination -> {
-                        try {
-                            IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
-                        } catch (final IOException e) {
-                            fail(e.getMessage());
-                        }
-                    };
+                return null;
+            }
+
+            @Override
+            public Method getMethod() {
+                try {
+                    return Application.class.getMethod(
+                            "install",
+                            Nexus.class, Nexus.class, GitConfiguration.class, LocalFileRepository.class,
+                            SshKey.class, File.class, String.class, String.class, String.class, String.class,
+                            String.class, String.class, String.class, int.class, int.class, Duration.class,
+                            boolean.class, boolean.class, PrintStream.class, PrintStream.class, Environment.class, GlobalConfiguration.class);
+                } catch (final NoSuchMethodException e) {
+                    throw new IllegalStateException(e);
                 }
-            },
-            new GitConfiguration(git.directory(), "ApplicationTest-install", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
-            new LocalFileRepository(new File("target/missing")),
-            new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-            new File("target/ApplicationTest-install-work/"),
-            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
-            new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
+            }
+
+            @Override
+            public List<Object> getParameters() {
+                return asList(null, null, null, null, null, null, null, null, null, "testenv", null, "art");
+            }
+
+            @Override
+            public String getName() {
+                return "install";
+            }
+
+            @Override
+            public List<ParameterMetadata> getParameterMetadata() {
+                return emptyList();
+            }
+        };
+        Environment.ENVIRONMENT_THREAD_LOCAL.set(new SystemEnvironment(singletonMap(Listeners.class, new Listeners(new GlobalConfiguration(new File("target/nothere/attall"))))));
+        try {
+            Notifier.intercept(ctx);
+        } finally {
+            Environment.ENVIRONMENT_THREAD_LOCAL.remove();
+        }
 
         assertEquals(asList(
             "[ -f \"/art/prod/bin/shutdown\" ] && \"/art/prod/bin/shutdown\" 1200 -force",
@@ -265,6 +321,15 @@ public class ApplicationTest {
                 "[ -f \"$proc_script_base/bin/post_startup.sh\" ] && \"$proc_script_base/bin/post_startup.sh\"\n" +
                 "\n", IO.slurp(new File(ssh.getHome(), "art/prod/bin/startup")));
         assertTrue(new String(out.toByteArray()).contains("art setup in /art/prod/ for host localhost:" + ssh.port() + ", you can now use start command."));
+
+        final List<String> msg = new ArrayList<>();
+        synchronized (MemListener.MESSAGES) {
+            msg.addAll(MemListener.MESSAGES);
+            MemListener.MESSAGES.clear();
+        }
+        assertEquals(2, msg.size());
+        assertTrue(msg.get(0).endsWith(" Executing (environment=testenv) install 'art'"));
+        assertTrue(msg.get(1).endsWith(" Executed (environment=testenv) install 'art', status=SUCCESS"));
     }
 
     @Test

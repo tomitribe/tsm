@@ -18,6 +18,7 @@ import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
 import com.tomitribe.tsm.file.TempDir;
 import com.tomitribe.tsm.ssh.Ssh;
 import lombok.NoArgsConstructor;
@@ -80,14 +81,14 @@ public class Application {
     private static final JsonReaderFactory READER_FACTORY = Json.createReaderFactory(
             Collections.singletonMap("org.apache.johnzon.supports-comments", "true"));
 
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                              @Option("node-index") @Default("-1") final int nodeIndex,
                              @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                              final GitConfiguration git,
-                             final String artifactId,
+                             @Notifier.Description final String artifactId,
                              @Out final PrintStream out,
                              final Environment crestEnv) throws IOException {
         execute(
@@ -95,14 +96,14 @@ public class Application {
                 "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void stop(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                             final GitConfiguration git,
-                            final String artifactId,
+                            @Notifier.Description final String artifactId,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
@@ -110,14 +111,14 @@ public class Application {
                 "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void restart(@Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                final GitConfiguration git,
-                               final String artifactId,
+                               @Notifier.Description final String artifactId,
                                @Out final PrintStream out,
                                final Environment crestEnv) throws IOException {
         execute(
@@ -145,7 +146,7 @@ public class Application {
                 }, crestEnv);
     }
 
-    @Command(value = "install-tar.gz", interceptedBy = DefaultParameters.class)
+    @Command(value = "install-tar.gz", interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void installTarGzArtifact(@Option("lib.") final Nexus nexusLib,
                                             @Option("environment") final String inEnvironment,
                                             @Option("ssh.") final SshKey sshKey,
@@ -153,7 +154,7 @@ public class Application {
                                             final GitConfiguration git,
                                             final LocalFileRepository localFileRepository,
                                             final Nexus nexus,
-                                            final String artifactId, final String coordinates,
+                                            @Notifier.Description final String artifactId, final String coordinates,
                                             @Out final PrintStream out,
                                             final Environment crestEnv) throws IOException {
         final String appWorkName = "installtargz_" + artifactId;
@@ -266,7 +267,7 @@ public class Application {
         }
     }
 
-    @Command(value = "update-config", interceptedBy = DefaultParameters.class)
+    @Command(value = "update-config", interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void updateConfig(final GitConfiguration git,
                                     final LocalFileRepository localFileRepository,
                                     @Option("ssh.") final SshKey sshKey,
@@ -275,7 +276,7 @@ public class Application {
                                     @Option("tribestream-version") final String tribestreamVersion,
                                     @Option("java-version") final String javaVersion,
                                     @Option("environment") final String environment,
-                                    final String artifactId,
+                                    @Notifier.Description final String artifactId,
                                     @Option("node-index") @Default("-1") final int nodeIndex,
                                     @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                     @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
@@ -321,7 +322,7 @@ public class Application {
         return null;
     }
 
-    @Command(value = "config-only", interceptedBy = DefaultParameters.class)
+    @Command(value = "config-only", interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void installConfigOnly(final Nexus nexus, // likely our apps
                                          @Option("lib.") final Nexus nexusLib, // likely central proxy
                                          final GitConfiguration git,
@@ -332,7 +333,7 @@ public class Application {
                                          @Option("tribestream-version") final String tribestreamVersion,
                                          @Option("java-version") final String javaVersion,
                                          @Option("environment") final String environment,
-                                         final String artifactId, // ie application in git
+                                         @Notifier.Description final String artifactId, // ie application in git
                                          @Option("node-index") @Default("-1") final int nodeIndex,
                                          @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                          @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
@@ -350,7 +351,7 @@ public class Application {
 
     // same as install but without groupId/artifactId (read from deployments.json)
     // behavior wise it is an alias for config-only
-    @Command(value = "quick-install", interceptedBy = DefaultParameters.class)
+    @Command(value = "quick-install", interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void quickInstall(final Nexus nexus, // likely our apps
                                     @Option("lib.") final Nexus nexusLib, // likely central proxy
                                     final GitConfiguration git,
@@ -361,7 +362,7 @@ public class Application {
                                     @Option("tribestream-version") final String tribestreamVersion,
                                     @Option("java-version") final String javaVersion,
                                     @Option("environment") final String environment,
-                                    final String artifactId, // ie application in git
+                                    @Notifier.Description final String artifactId, // ie application in git
                                     @Option("node-index") @Default("-1") final int nodeIndex,
                                     @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                     @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause,
@@ -378,7 +379,7 @@ public class Application {
     }
 
     // meta command reading tsm-metadata.json to set git, server, env, app and java config
-    @Command(interceptedBy = DefaultParameters.class, value = "install-from-metadata", usage = "application install-from-metadata my-tsm-metadata.json")
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class}, value = "install-from-metadata", usage = "application install-from-metadata my-tsm-metadata.json")
     public static void installFromMetadata(final Nexus nexus,
                                            @Option("lib.") final Nexus nexusLib,
                                            final GitConfiguration git,
@@ -391,7 +392,7 @@ public class Application {
                                            @Option("restart") @Default("false") final boolean restart,
                                            @Out final PrintStream out,
                                            @Out final PrintStream err,
-                                           final File tsmMetadata,
+                                           @Notifier.Description final File tsmMetadata,
                                            final Environment crestEnv,
                                            final GlobalConfiguration configuration) throws IOException {
         final String tomee;
@@ -445,7 +446,7 @@ public class Application {
     }
 
     // this is the master logic for all deployments (application, config only etc...)
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
     public static void install(final Nexus nexus, // likely for our apps
                                @Option("lib.") final Nexus nexusLib, // likely central proxy for webapps and libraries
                                final GitConfiguration git,
@@ -456,7 +457,7 @@ public class Application {
                                @Option("tribestream-version") final String tribestreamVersion,
                                @Option("java-version") final String javaVersion,
                                @Option("environment") final String inEnvironment,
-                               final String inGroupId, final String inArtifactId, final String inVersion,
+                               final String inGroupId, @Notifier.Description final String inArtifactId, final String inVersion,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default

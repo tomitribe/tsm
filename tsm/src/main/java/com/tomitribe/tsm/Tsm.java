@@ -10,6 +10,7 @@
 package com.tomitribe.tsm;
 
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
+import com.tomitribe.tsm.listener.Listeners;
 import jline.console.history.History;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ import static lombok.AccessLevel.PRIVATE;
 public class Tsm {
     public static void main(final String[] args) throws Exception {
         final String tsmRc = ofNullable(System.getProperty("tsm.rc.location"))
-            .orElseGet(() -> new File(System.getProperty("user.home"), ".tsmrc").getAbsolutePath());
+                .orElseGet(() -> new File(System.getProperty("user.home"), ".tsmrc").getAbsolutePath());
 
         final GlobalConfiguration configuration = new GlobalConfiguration(new File(tsmRc));
 
@@ -59,6 +60,10 @@ public class Tsm {
                 options.remove(pathname);
             }
         }
+
+        final Map<Class<?>, Object> services = new HashMap<>();
+        services.put(GlobalConfiguration.class, configuration);
+        services.put(Listeners.class, new Listeners(configuration));
 
         if (interactive) {
             new CrestCli() {
@@ -81,13 +86,10 @@ public class Tsm {
 
                 @Override
                 protected CliEnvironment createMainEnvironment(final AtomicReference<InputReader> input, final AtomicReference<History> history) {
-                    return new TsmEnvironment(super.createMainEnvironment(input, history), configuration);
+                    return new TsmEnvironment(super.createMainEnvironment(input, history), services);
                 }
             }.run(options.toArray(new String[options.size()]));
         } else { // single command
-            final Map<Class<?>, Object> services = new HashMap<>();
-            services.put(GlobalConfiguration.class, configuration);
-
             final SystemEnvironment env = new SystemEnvironment(services);
             Environment.ENVIRONMENT_THREAD_LOCAL.set(env); // before next line otherwise meta are wrong
             try {
@@ -112,7 +114,7 @@ public class Tsm {
     @RequiredArgsConstructor
     private static class TsmEnvironment implements CliEnvironment {
         private final CliEnvironment cliEnv;
-        private final GlobalConfiguration configuration;
+        private final Map<Class<?>, Object> services;
 
         @Override
         public PrintStream getOutput() {
@@ -136,7 +138,7 @@ public class Tsm {
 
         @Override
         public <T> T findService(final Class<T> service) {
-            return service == GlobalConfiguration.class ? service.cast(configuration) : cliEnv.findService(service);
+            return (T) services.get(service);
         }
 
         @Override
