@@ -17,7 +17,7 @@
 
   <groupId>com.tomitribe.tsm</groupId>
   <artifactId>tsm-parent</artifactId>
-  <version>0.5-SNAPSHOT</version>
+  <version>0.5</version>
   <packaging>pom</packaging>
   <name>TSM</name>
   <description>Tribestream Server Management tool</description>
