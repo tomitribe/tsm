@@ -195,7 +195,7 @@ public class Application {
                     final String remoteWorkDir = fixedBase + "work-provisioning/";
                     final String target = remoteWorkDir + tarGz.getName();
                     final String targetFolder = fixedBase + segments[1] + "/" + segments[1] + '-' + segments[2] + '/';
-                    final String additionalBase = fixedBase + artifactId + '/' + inEnvironment + '/';
+                    final String additionalBase = fixedBase + artifactId + '/' + contextualEnvironment.getName() + '/';
                     try (final Ssh ssh = newSsh(sshKey, host, app, env)) {
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
                                 .scp(tarGz, target, new ProgressBar(out, "Installing " + segments[1] + " on " + host))
@@ -210,7 +210,7 @@ public class Application {
                         });
 
                         final List<File> foldersToSyncs = new LinkedList<>();
-                        final String envFolder = envFolder(env, inEnvironment);
+                        final String envFolder = envFolder(env, contextualEnvironment.getName());
                         final List<String> configFolders = asList(artifactId, artifactId + "-" + envFolder);
                         configFolders.forEach(folder -> {
                             final File foldersToSync = new File(clone.get().getParentFile(), folder);
