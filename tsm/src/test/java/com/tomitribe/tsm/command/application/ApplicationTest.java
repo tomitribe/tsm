@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import static java.util.Arrays.asList;
@@ -58,6 +57,8 @@ public class ApplicationTest {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/prod", p).mkdirs());
         } else if (cmd.equals("cd \"/art2/other/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/other", p).mkdirs());
+        } else if (cmd.equals("cd \"/configonly/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
+            asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configonly/prod", p).mkdirs());
         }
     });
 
@@ -248,8 +249,9 @@ public class ApplicationTest {
 
         final String meta = IO.slurp(new File(ssh.getHome(), "art/prod/conf/tsm-metadata.json"))
             .replaceAll("\"date\":\"[^\"]*\"", "\"date\":\"DATE\"")
-            .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"");
-        assertTrue(meta, meta.contains(
+            .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"")
+            .replace("\n\r", "\n");
+        assertEquals(meta,
             "{\n" +
             "  \"date\":\"DATE\",\n" +
             "  \"host\":\"localhost:" + ssh.port() + "\",\n" +
@@ -257,7 +259,8 @@ public class ApplicationTest {
             "  \"application\":{\n" +
             "    \"groupId\":\"com.foo.bar\",\n" +
             "    \"artifactId\":\"art\",\n" +
-            "    \"version\":\"1.0\"\n" +
+            "    \"version\":\"1.0\",\n" +
+            "    \"originalArtifact\":\"art\"\n" +
             "  },\n" +
             "  \"git\":{\n" +
             "    \"branch\":\"master\",\n" +
@@ -269,7 +272,7 @@ public class ApplicationTest {
             "  \"java\":{\n" +
             "    \"version\":\"8u60\"\n" +
             "  }\n" +
-            "}\n"));
+            "}\n");
         assertEquals(
             "#! /bin/bash\n" +
                 "\n" +
@@ -330,6 +333,83 @@ public class ApplicationTest {
         assertEquals(2, msg.size());
         assertTrue(msg.get(0).endsWith(" Executing (environment=testenv) install 'art'"));
         assertTrue(msg.get(1).endsWith(" Executed (environment=testenv) install 'art', status=SUCCESS"));
+    }
+
+
+    @Test
+    public void configOnlyOneWebapp() throws Throwable {
+        git.addFile(
+                "configonly/deployments.json",
+                "{\"environments\":[{" +
+                        "\"hosts\":[\"localhost:" + git.getSshPort() + "\"]," +
+                        "\"webapps\": [\"com.company:superart:0.1.2?context=super\"]," +
+                        "\"names\":[\"prod\"]," +
+                        "\"base\":\"/\"," +
+                        "\"user\":\"" + git.getSshUser() + "\"" +
+                        "}]}");
+
+        Application.installConfigOnly(
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new GitConfiguration(git.directory(), "ApplicationTest-install", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+                new LocalFileRepository(new File("target/missing")),
+                new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+                new File("target/ApplicationTest-configonly-onewebapp-work/"),
+                "7.0.1", null, "8u112", "prod", "configonly", -1, -1, new Duration("-1 minutes"), false, false,
+                new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
+
+        final String meta = IO.slurp(new File(ssh.getHome(), "configonly/prod/conf/tsm-metadata.json"))
+            .replaceAll("\"date\":\"[^\"]*\"", "\"date\":\"DATE\"")
+            .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"")
+            .replace("\n\r", "\n");
+        assertEquals(meta,
+            "{\n" +
+            "  \"date\":\"DATE\",\n" +
+            "  \"host\":\"localhost:" + ssh.port() + "\",\n" +
+            "  \"environment\":\"prod\",\n" +
+            "  \"application\":{\n" +
+            "    \"groupId\":\"com.company\",\n" +
+            "    \"artifactId\":\"configonly\",\n" +
+            "    \"version\":\"0.1.2\",\n" +
+            "    \"originalArtifact\":\"superart\"\n" +
+            "  },\n" +
+            "  \"git\":{\n" +
+            "    \"branch\":\"master\",\n" +
+            "    \"revision\":\"REV\"\n" +
+            "  },\n" +
+            "  \"server\":{\n" +
+            "    \"name\":\"apache-tomee-7.0.1\"\n" +
+            "  },\n" +
+            "  \"java\":{\n" +
+            "    \"version\":\"8u112\"\n" +
+            "  }\n" +
+            "}\n");
     }
 
     @Test

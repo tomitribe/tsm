@@ -35,6 +35,7 @@ public @interface Tsm {
         ENVIRONMENT(new String[] {"environment"}),
         GROUPID(new String[] {"application", "groupId"}),
         ARTIFACTID(new String[] {"application", "artifactId"}),
+        TSM_ARTIFACT(new String[] {"application", "originalArtifact"}),
         VERSION(new String[] {"application", "version"}),
         BRANCH(new String[] {"git", "branch"}),
         REVISION(new String[] {"git", "revision"}),

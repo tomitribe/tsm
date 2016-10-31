@@ -719,9 +719,10 @@ public class Application {
                                 writer.write("  \"host\":\"" + host + "\",\n");
                                 writer.write("  \"environment\":\"" + envName + "\",\n");
                                 writer.write("  \"application\":{\n");
-                                writer.write("    \"groupId\":\"" + ofNullable(groupId).orElse("") + "\",\n");
-                                writer.write("    \"artifactId\":\"" + artifactId + "\",\n");
-                                writer.write("    \"version\":\"" + ofNullable(version).orElse("") + "\"\n");
+                                writer.write("    \"groupId\":\"" + ofNullable(metaGroup).orElse("") + "\",\n");
+                                writer.write("    \"artifactId\":\"" + artifactId + "\",\n"); // tsm one for compatibility and often the same
+                                writer.write("    \"version\":\"" + ofNullable(metaVersion).orElse("") + "\",\n");
+                                writer.write("    \"originalArtifact\":\"" + metaArtifact + "\"\n");
                                 writer.write("  },\n");
                                 writer.write("  \"git\":{\n");
                                 writer.write("    \"branch\":\"" + git.getBranch() + "\",\n");

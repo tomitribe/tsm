@@ -51,10 +51,16 @@ public class TsmMetadataProducer {
     @Tsm(Tsm.Key.DATE /* whatever */)
     @Produces
     public String readMeta(final InjectionPoint ip) {
-        final String[] paths = ip.getAnnotated().getAnnotation(Tsm.class).value().getPath();
+        final Tsm.Key key = ip.getAnnotated().getAnnotation(Tsm.class).value();
+
+        final String[] paths = key.getPath();
         JsonObject object = metadata;
         for (int i = 0; i < paths.length - 1; i++) {
             object = object.getJsonObject(paths[i]);
+        }
+
+        if (key == Tsm.Key.TSM_ARTIFACT && !object.containsKey(paths[paths.length - 1])) { // fallback on artifactId if not present
+            return object.getString(Tsm.Key.ARTIFACTID.getPath()[paths.length - 1]); // yes both have the same length so this is an indexing shortcut
         }
         return object.getString(paths[paths.length - 1]);
     }
