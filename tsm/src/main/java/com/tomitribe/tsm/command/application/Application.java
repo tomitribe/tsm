@@ -497,11 +497,12 @@ public class Application {
 
                 final Collection<File> additionalLibs = new LinkedList<>();
                 final Map<String, File> additionalCustomLibs = new TreeMap<>();
-                final Map<String, File> additionalWebapps = new TreeMap<String, File>();
+                final Map<String, File> additionalWebapps = new TreeMap<>();
+                final AtomicReference<String[]> singleWebapp = new AtomicReference<>(); // reused if we have a single webapp, don't parse N times
                 if (nexusLib != null) {
                     ofNullable(env.getLibs()).orElse(emptyList()).forEach(lib -> additionalLibs.add(findLib(nexus, nexusLib, out, workDir, lib)));
                     ofNullable(env.getCustomLibs()).orElse(emptyMap()).forEach((target, coords) -> additionalCustomLibs.put(target, findLib(nexus, nexusLib, out, workDir, coords)));
-                    ofNullable(env.getWebapps()).orElse(emptyList()).stream().forEach(war -> {
+                    ofNullable(env.getWebapps()).orElse(emptyList()).forEach(war -> {
                         final String[] segments = war.replaceAll("\\?.*", "").split(":");
                         final int contextIdx = war.indexOf("?context=");
 
@@ -520,10 +521,14 @@ public class Application {
                                 }
                             }
                         }
+                        singleWebapp.set(segments);
 
                         final String context = contextIdx > 0 ? war.substring(contextIdx + "?context=".length()) : segments[1];
                         additionalWebapps.put(context, local);
                     });
+                    if (additionalWebapps.size() > 1) {
+                        singleWebapp.set(null);
+                    }
                 }
 
                 final AtomicReference<String> chosenServerVersion = new AtomicReference<>(
@@ -697,6 +702,17 @@ public class Application {
 
                         {   // just to be able to know what we did and when when browsing manually the installation, we could add much more if needed
                             final File metadata = new File(workDir, "tsm-metadata.json"); // sample usage in com.sbux.pos.basket.configuration.aspconfig.TsmPropertiesProvider
+
+                            // if using config-only to install a webapp, extract metadata from the only webapp
+                            String metaGroup = groupId;
+                            String metaArtifact = artifactId;
+                            String metaVersion = version;
+                            if (downloadedFile == null && additionalWebapps.size() == 1) {
+                                metaGroup = singleWebapp.get()[0];
+                                metaArtifact = singleWebapp.get()[1];
+                                metaVersion = singleWebapp.get()[2];
+                            }
+
                             try (final FileWriter writer = new FileWriter(metadata)) {
                                 writer.write("{\n");
                                 writer.write("  \"date\":\"" + LocalDateTime.now().toString() + "\",\n");
