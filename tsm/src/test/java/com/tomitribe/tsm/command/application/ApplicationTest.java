@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import static java.util.Arrays.asList;
@@ -410,6 +411,26 @@ public class ApplicationTest {
             "    \"version\":\"8u112\"\n" +
             "  }\n" +
             "}\n");
+    }
+
+    @Test
+    public void exec() throws IOException {
+        git.addDeploymentsJson("exec");
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Application.exec(
+                "prod",
+                new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+                new File("target/ApplicationTest-exec/"),
+                -1, -1,
+                new GitConfiguration(git.directory(), "ApplicationTest-install-envs", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+                "exec", "exectest %environment",
+                new PrintStream(out),
+                ENVIRONMENT);
+        final String output = new String(out.toByteArray());
+        assertTrue(output, output.contains("Executing command for exec on localhost:" + git.getSshPort() + " for environment prod"));
+        final Collection<String> commands = ssh.commands();
+        assertEquals("exectest prod", commands.iterator().next());
+        assertEquals(1, commands.size());
     }
 
     @Test

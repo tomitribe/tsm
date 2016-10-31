@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
@@ -94,6 +95,22 @@ public class Application {
         execute(
                 environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
+    }
+
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    public static void exec(@Option("environment") final String environment,
+                            @Option("ssh.") final SshKey sshKey,
+                            @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                            @Option("node-index") @Default("-1") final int nodeIndex,
+                            @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                            final GitConfiguration git,
+                            @Notifier.Description final String artifactId,
+                            final String cmd,
+                            @Out final PrintStream out,
+                            final Environment crestEnv) throws IOException {
+        execute(
+                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                "Executing command for %s on %s for environment %s", cmd);
     }
 
     @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
@@ -1064,7 +1081,12 @@ public class Application {
 
                     try (final Ssh ssh = newSsh(sshKey, host, app, environment)) {
                         final String targetFolder = environment.getBase() + (environment.getBase().endsWith("/") ? "" : "/") + artifactId + (skipEnvFolder ? "" : ("/" + env.getName()));
-                        asList(cmdBuilder.apply(environment)).stream().map(c -> String.format(c, targetFolder)).forEach(ssh::exec);
+                        Stream.of(cmdBuilder.apply(environment))
+                                .map(c -> Substitutors.resolveWithVariables((c.contains("%s") ? String.format(c, targetFolder) : c)
+                                                .replace("%targetFolder", targetFolder)
+                                                .replace("%environment", env.getName()),
+                                        env.getEnvironment().getProperties(), app.getProperties()))
+                                .forEach(ssh::exec);
                     }
                 });
             });
