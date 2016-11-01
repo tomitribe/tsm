@@ -60,7 +60,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static com.tomitribe.tsm.crest.CrestOutputCapture.capture;
@@ -105,9 +104,17 @@ public class Application {
                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                             final GitConfiguration git,
                             @Notifier.Description final String artifactId,
-                            final String cmd,
+                            final String inCmd,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
+        final String cmd;
+        if (inCmd.startsWith("@")) {
+            try (final BufferedReader r = new BufferedReader(new FileReader(inCmd.substring(1)))) {
+                cmd = r.readLine();
+            }
+        } else {
+            cmd = inCmd;
+        }
         execute(
                 environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Executing command for %s on %s for environment %s", cmd);
@@ -1072,7 +1079,14 @@ public class Application {
 
                 final AtomicInteger currentIdx = new AtomicInteger();
                 final NodeSelector selector = new NodeSelector(nodeIndex, nodeGroup);
+
+                final Map<String, Iterator<String>> byHostEntries = ofNullable(env.getEnvironment().getByHostProperties()).orElse(emptyMap())
+                        .entrySet().stream().collect(toMap(Map.Entry::getKey, e -> e.getValue().iterator()));
+
                 environment.getHosts().forEach(host -> {
+                    byHostEntries.forEach((k, v) -> env.getEnvironment().getProperties().put(k, v.next()));
+                    env.getEnvironment().getProperties().putIfAbsent("host", host);
+
                     if (!selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
                     }
