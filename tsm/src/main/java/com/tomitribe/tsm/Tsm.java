@@ -93,7 +93,7 @@ public class Tsm {
             final SystemEnvironment env = new SystemEnvironment(services);
             Environment.ENVIRONMENT_THREAD_LOCAL.set(env); // before next line otherwise meta are wrong
             try {
-                new Main().main(env, args);
+                new Main().main(env, options.toArray(new String[options.size()]));
             } catch (final CommandFailedException e) {
                 final Throwable cause = e.getCause();
                 final Exit exit = cause.getClass().getAnnotation(Exit.class);
