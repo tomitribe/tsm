@@ -38,16 +38,16 @@ public class ProgressBarTest {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final PrintStream stream = new PrintStream(out);
         final ProgressBar bar = new ProgressBar(stream, "prefix");
-        assertEquals("prefix   0.00% [                                                  ] 0s\r", new String(out.toByteArray()));
+        assertEquals("\rprefix   0.00% [                                                  ] 0s", new String(out.toByteArray()));
         bar.accept(20.);
         assertEquals(
-                "prefix   0.00% [                                                  ] 0s\r" +
-                "prefix  20.00% [==========                                        ] 0s\r", new String(out.toByteArray()));
+                "\rprefix   0.00% [                                                  ] 0s" +
+                "\rprefix  20.00% [==========                                        ] 0s", new String(out.toByteArray()));
         bar.accept(100.);
         assertEquals(
-            "prefix   0.00% [                                                  ] 0s\r" +
-            "prefix  20.00% [==========                                        ] 0s\r" +
-            "prefix 100.00% [==================================================] 0s\n",
+            "\rprefix   0.00% [                                                  ] 0s" +
+            "\rprefix  20.00% [==========                                        ] 0s" +
+            "\rprefix 100.00% [==================================================] 0s\n",
             new String(out.toByteArray()));
     }
 }

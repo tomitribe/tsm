@@ -37,14 +37,13 @@ public class ProgressBar implements Consumer<Double> {
     @Override
     public void accept(final Double perCent) {
         int newCurrent = (int) (perCent / factor);
+        logger.print("\r");
         logger.print(String.format("%s %6.2f%% [", text, perCent));
         IntStream.range(0, newCurrent).forEach(i -> logger.print('='));
         IntStream.range(newCurrent, width).forEach(i -> logger.print(' '));
         logger.print("] " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + "s");
         if (perCent == 100) {
             logger.println();
-        } else {
-            logger.print("\r");
         }
     }
 }
