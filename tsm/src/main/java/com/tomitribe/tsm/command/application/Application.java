@@ -538,6 +538,14 @@ public class Application {
                             final String aType = segments.length >= 4 ? segments[3] : "war";
                             final String aClassifier = segments.length >= 5 ? segments[4] : null;
                             try {
+                                final File m2Local = localFileRepository.find(gId, aId, aVersion, aClassifier, aType);
+                                if (m2Local.isFile()) {
+                                    try {
+                                        IO.copy(m2Local, local);
+                                    } catch (final IOException e) {
+                                        // ignore, let download it anyway
+                                    }
+                                }
                                 nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                             } catch (final IllegalStateException ise) {
                                 if (nexus != null) {

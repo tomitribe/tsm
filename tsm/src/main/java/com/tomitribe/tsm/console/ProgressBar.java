@@ -17,9 +17,9 @@ import java.util.stream.IntStream;
 public class ProgressBar implements Consumer<Double> {
     private final double factor;
     private final PrintStream logger;
+    private final String text;
+    private final int width;
     private final long start;
-
-    private int current;
 
     public ProgressBar(final PrintStream logger, final String text) {
         this(logger, text, 50);
@@ -28,19 +28,23 @@ public class ProgressBar implements Consumer<Double> {
     public ProgressBar(final PrintStream logger, final String text, final int width) {
         this.factor = 100. / width;
         this.logger = logger;
-        logger.print(text + " [");
+        this.text = text;
+        this.width = width;
         start = System.currentTimeMillis();
+        accept(0.);
     }
 
     @Override
     public void accept(final Double perCent) {
         int newCurrent = (int) (perCent / factor);
-        if (newCurrent > current) {
-            IntStream.range(0, newCurrent - current).forEach(i -> logger.print('='));
-            current = newCurrent;
-        }
+        logger.print(String.format("%s %6.2f%% [", text, perCent));
+        IntStream.range(0, newCurrent).forEach(i -> logger.print('='));
+        IntStream.range(newCurrent, width).forEach(i -> logger.print(' '));
+        logger.print("] " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + "s");
         if (perCent == 100) {
-            logger.println("] " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + "s");
+            logger.println();
+        } else {
+            logger.print("\r");
         }
     }
 }

@@ -9,28 +9,45 @@
  */
 package com.tomitribe.tsm.console;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.util.stream.IntStream;
+import java.util.Locale;
 
-import static java.lang.System.lineSeparator;
-import static java.util.stream.Collectors.joining;
 import static org.junit.Assert.assertEquals;
 
 public class ProgressBarTest {
+    private Locale original;
+
+    @Before
+    public void setLocale() {
+        original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+    }
+
+    @After
+    public void resetLocale() {
+        Locale.setDefault(original);
+    }
+
     @Test
     public void progress() {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final PrintStream stream = new PrintStream(out);
         final ProgressBar bar = new ProgressBar(stream, "prefix");
-        assertEquals("prefix [", new String(out.toByteArray()));
+        assertEquals("prefix   0.00% [                                                  ] 0s\r", new String(out.toByteArray()));
         bar.accept(20.);
-        assertEquals("prefix [" + IntStream.range(0, 10).mapToObj(i -> "=").collect(joining()), new String(out.toByteArray()));
+        assertEquals(
+                "prefix   0.00% [                                                  ] 0s\r" +
+                "prefix  20.00% [==========                                        ] 0s\r", new String(out.toByteArray()));
         bar.accept(100.);
         assertEquals(
-            "prefix [" + IntStream.range(0, 50).mapToObj(i -> "=").collect(joining()) + "] 0s" + lineSeparator(),
+            "prefix   0.00% [                                                  ] 0s\r" +
+            "prefix  20.00% [==========                                        ] 0s\r" +
+            "prefix 100.00% [==================================================] 0s\n",
             new String(out.toByteArray()));
     }
 }
