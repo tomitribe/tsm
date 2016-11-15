@@ -580,6 +580,7 @@ public class Application {
                     // override by host variables
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
                     env.getProperties().putIfAbsent("host", host);
+                    env.getProperties().putIfAbsent("environment", envName);
 
                     if (nodeIndex >= 0 && !selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
@@ -1094,6 +1095,7 @@ public class Application {
                 environment.getHosts().forEach(host -> {
                     byHostEntries.forEach((k, v) -> env.getEnvironment().getProperties().put(k, v.next()));
                     env.getEnvironment().getProperties().putIfAbsent("host", host);
+                    env.getEnvironment().getProperties().putIfAbsent("environment", env.getName());
 
                     if (!selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
