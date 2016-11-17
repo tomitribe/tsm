@@ -543,10 +543,11 @@ public class Application {
                                     try {
                                         IO.copy(m2Local, local);
                                     } catch (final IOException e) {
-                                        // ignore, let download it anyway
+                                        nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                                     }
+                                } else {
+                                    nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                                 }
-                                nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
                             } catch (final IllegalStateException ise) {
                                 if (nexus != null) {
                                     nexus.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
