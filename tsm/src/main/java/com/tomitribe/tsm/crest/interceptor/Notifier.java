@@ -23,6 +23,8 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static lombok.AccessLevel.PRIVATE;
 
@@ -50,26 +52,41 @@ public class Notifier {
             }
         }
 
-        notify(id, description, "Executing " + constantText);
+        final Listeners listeners = Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(Listeners.class);
+        final AtomicReference<Throwable> error = new AtomicReference<>();
+        final AtomicBoolean done = new AtomicBoolean();
+        final String desc = description;
+        final String cText = constantText;
+        final Thread shutdownHook = new Thread() {
+            @Override
+            public void run() {
+                final Throwable failed = error.get();
+                Notifier.notify(listeners, id, desc, "Executed " + cText + ", status=" +
+                        (failed != null ? "FAILED (" + failed.getMessage() + ")" : (!done.get() ? "CANCEL" : "SUCCESS")));
+            }
+        };
+        notify(listeners, id, description, "Executing " + constantText);
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
         Throwable failed = null;
         try {
             return context.proceed();
         } catch (final Throwable oops) {
-            failed = oops;
+            error.set(failed);
             throw oops;
         } finally {
-            notify(id, description, "Executed " + constantText + ", status=" + (failed != null ? "FAILED (" + failed.getMessage() + ")" : "SUCCESS"));
+            done.set(true);
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            shutdownHook.run();
         }
     }
 
-    private static void notify(final String id, final String marker, final String message) {
-        Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(Listeners.class)
-                .sendMessage(marker, "[id=" + id + "][user=" + System.getProperty("user.name", "unknown") + "] " + message);
+    private static void notify(final Listeners listeners, final String id, final String marker, final String message) {
+        listeners.sendMessage(marker, "[id=" + id + "][user=" + System.getProperty("user.name", "unknown") + "] " + message);
     }
 
     /**
      * Marks a <b>single</b> parameter of the method as being used in the notification as human identifier.
-     *
+     * <p>
      * Note: if needed later we can support something like @Description("%1s -> %2s") using Formatter but this is more fragile.
      */
     @Retention(RetentionPolicy.RUNTIME)
