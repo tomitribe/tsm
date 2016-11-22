@@ -792,7 +792,7 @@ public class Application {
                                             "# chkconfig: 345 99 01\n" + // <levels> <start> <stop>
                                             "# description: handles " + artifactId + "\n" +
                                             "\n" + envrt + "\n\n" +
-                                            "exec $CATALINA_HOME/bin/catalina.sh $*" +
+                                            "sudo -u " + env.getUser() + " $CATALINA_HOME/bin/catalina.sh $*" +
                                             "");
                                 } catch (final IOException e) {
                                     throw new IllegalStateException(e);
