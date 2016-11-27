@@ -530,7 +530,8 @@ public class Application {
                         final String[] segments = war.replaceAll("\\?.*", "").split(":");
                         final int contextIdx = war.indexOf("?context=");
 
-                        final File local = new File(workDir, segments[1] + ".war");
+                        final File local = new File(workDir, segments[1] + "-" + segments[2] +
+                                ofNullable(segments.length >= 5 ? segments[4] : null).map(c -> c + '-').orElse("") + ".war");
                         if (!local.isFile()) {
                             final String gId = segments[0];
                             final String aId = segments[1];
