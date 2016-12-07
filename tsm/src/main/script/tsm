@@ -54,4 +54,4 @@ if $cygwin; then
   tsm_classpath=`cygpath --path --windows "$tsm_classpath"`
 fi
 
-"$JAVA_PATH" "-Dtsm.home=$TSM_HOME $JAVA_OPTS" -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@
+"$JAVA_PATH" "-Dtsm.home=$TSM_HOME" $JAVA_OPTS $TSM_OPTS -cp "$tsm_classpath" com.tomitribe.tsm.Tsm $@

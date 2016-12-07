@@ -239,3 +239,109 @@ This command allows to setup a binary from a tar.gz file on the server. It execu
 
 TIP: doing the same manually on all hosts allows TSM to reuse this manual installation.
 
+== NodeJS
+
+Since version 0.7 TSM can install node:
+
+[source]
+----
+node install myApplication --environment=prod [--version=v7.2.1]
+----
+
+The installation is pretty similar to TomEE or Tribestream.
+
+=== Executed commands
+
+For the installation of a war (default case) TSM will execute these commands (${xxxx} values are dependent on your configuration):
+
+1. `mkdir -p ${base}/work-provisioning/ "${base}/node/node-${node.version}-${node.classifier}/"`
+2. upload node tar.gz archive to `${base}/work-provisioning/`
+3. `tar xvf "${base}/work-provisioning/node-node-${node.version}-${node.classifier}.tar.gz" -C "${base}/node/node-${node.version}/" --strip 1`
+4. `rm "${base}/work-provisioning/node-${node.version}-${node.classifier}.tar.gz"`
+
+
+=== NodeJS Applications
+
+Once NodeJS is installed an application installation is just a matter of deploying the program and launching the right command.
+
+I recommand you to refer to `application install-tar.gz` command which can help to grab a tar.gz from nexus and install it.
+The only point to take care is to provide a valid `bin/startup` and `bin/shutdown`.
+
+Assuming you will define this layout in your git module:
+
+[source]
+----
+<git root>
+   `- myapplication
+         `- myapplication[-${environment}]
+                 |- bin
+                 |   |- base.sh
+                 |   |- startup
+                 |   `- shutdown
+                 `- ....
+----
+
+Next subparts are about sample scripts respecting this layout.
+
+==== base.sh
+
+[source]
+----
+#! /bin/bash
+
+node_version=v7.2.1
+
+# your main script to launch (relative to the application folder/tar.gz)
+export APPLICATION=myapp.js
+
+# app config
+export NODE_ENV=${environment}
+export PORT=8080
+
+# use a persistent location for log+pid since ${base}/${artifact} is resetted for each redeployment
+export PID_FILE=${base}/${artifact}-${environment}/${artifact}.pid
+export LOG_DIR=${base}/logs/${artifact}/${environment}/
+
+# where to find node
+export NODE_HOME=${base}/node/node-${node_version}
+
+# ensure folders are there
+mkdir -p $LOG_DIR
+----
+
+==== startup
+
+[source]
+----
+#! /bin/bash
+
+base="$(dirname $0)/base.sh"
+chmod +x $base
+source $base
+
+# go in the application folder (it allows to have config/ there which is quite convenient)
+cd ${base}/${artifact}/${environment}
+
+# start without waiting the node program, log in nohup.log and write the pid in $PID_FILE
+nohup PORT=$PORT NODE_ENV=$NODE_ENV $NODE_HOME/bin/node $APPLICATION 1>$LOG_DIR/nohup.log 2>&1 & echo $! > $PID_FILE
+----
+
+==== shutdown
+
+The shutdown script just kills Node.JS instance.
+
+[source]
+----
+#! /bin/bash
+
+base="$(dirname $0)/base.sh"
+chmod +x $base
+source $base
+
+if [ -f "$PID_FILE" ]; then
+   pid=$(cat "$PID_FILE")
+   kill -9 $pid || echo "${artifact} (${environment}) not found or $PID_FILE not found"
+else
+   echo "No ${artifact} (${environment}) found"
+fi
+----
