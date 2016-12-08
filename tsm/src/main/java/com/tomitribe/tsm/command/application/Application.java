@@ -18,6 +18,7 @@ import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.LocalExecution;
 import com.tomitribe.tsm.crest.interceptor.Notifier;
 import com.tomitribe.tsm.file.TempDir;
 import com.tomitribe.tsm.ssh.Ssh;
@@ -81,7 +82,7 @@ public class Application {
     private static final JsonReaderFactory READER_FACTORY = Json.createReaderFactory(
             Collections.singletonMap("org.apache.johnzon.supports-comments", "true"));
 
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void start(@Option("environment") final String environment,
                              @Option("ssh.") final SshKey sshKey,
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -96,7 +97,7 @@ public class Application {
                 "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void exec(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -120,7 +121,7 @@ public class Application {
                 "Executing command for %s on %s for environment %s", cmd);
     }
 
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void stop(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -135,7 +136,7 @@ public class Application {
                 "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void restart(@Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -150,7 +151,7 @@ public class Application {
                 "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, LocalExecution.class})
     public static void ping(@Option("environment") final String environment,
                             @Option("ssh.") final SshKey sshKey,
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -170,7 +171,7 @@ public class Application {
                 }, crestEnv);
     }
 
-    @Command(value = "install-tar.gz", interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(value = "install-tar.gz", interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void installTarGzArtifact(@Option("lib.") final Nexus nexusLib,
                                             @Option("environment") final String inEnvironment,
                                             @Option("ssh.") final SshKey sshKey,
@@ -291,7 +292,7 @@ public class Application {
         }
     }
 
-    @Command(value = "update-config", interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(value = "update-config", interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void updateConfig(final GitConfiguration git,
                                     final LocalFileRepository localFileRepository,
                                     @Option("ssh.") final SshKey sshKey,
@@ -346,7 +347,7 @@ public class Application {
         return null;
     }
 
-    @Command(value = "config-only", interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(value = "config-only", interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void installConfigOnly(final Nexus nexus, // likely our apps
                                          @Option("lib.") final Nexus nexusLib, // likely central proxy
                                          final GitConfiguration git,
@@ -375,7 +376,7 @@ public class Application {
 
     // same as install but without groupId/artifactId (read from deployments.json)
     // behavior wise it is an alias for config-only
-    @Command(value = "quick-install", interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(value = "quick-install", interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void quickInstall(final Nexus nexus, // likely our apps
                                     @Option("lib.") final Nexus nexusLib, // likely central proxy
                                     final GitConfiguration git,
@@ -403,7 +404,8 @@ public class Application {
     }
 
     // meta command reading tsm-metadata.json to set git, server, env, app and java config
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class}, value = "install-from-metadata", usage = "application install-from-metadata my-tsm-metadata.json")
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class}, value = "install-from-metadata",
+            usage = "application install-from-metadata my-tsm-metadata.json")
     public static void installFromMetadata(final Nexus nexus,
                                            @Option("lib.") final Nexus nexusLib,
                                            final GitConfiguration git,
@@ -470,7 +472,7 @@ public class Application {
     }
 
     // this is the master logic for all deployments (application, config only etc...)
-    @Command(interceptedBy = {DefaultParameters.class, Notifier.class})
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void install(final Nexus nexus, // likely for our apps
                                @Option("lib.") final Nexus nexusLib, // likely central proxy for webapps and libraries
                                final GitConfiguration git,

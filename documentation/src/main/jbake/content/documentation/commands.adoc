@@ -345,3 +345,11 @@ else
    echo "No ${artifact} (${environment}) found"
 fi
 ----
+
+== Tip
+
+Adding to the command lanuching (tsm main if you use the interactive mode) `--local` will start a local SSH server
+and auto configure the environment to `local` and the associated hosts if not in deployments.json to use the embedded server.
+
+It allows to deploy locally easily. The only requirement is to define a "local" environment in the deployments.json
+with a local/dev configuration.

@@ -27,9 +27,14 @@ import static java.util.Optional.ofNullable;
 public final class GlobalConfiguration {
     private final Properties properties = new Properties();
     private volatile Map<String, Map<String, ?>> defaults;
+    private boolean local;
 
     public GlobalConfiguration(final File tsmrcLocation) {
         reload(tsmrcLocation);
+    }
+
+    public boolean isLocal() {
+        return local;
     }
 
     public String read(final String... keys) {
@@ -67,6 +72,8 @@ public final class GlobalConfiguration {
         } catch (final IOException e) {
             throw new IllegalStateException(e);
         }
+
+        local = "true".equalsIgnoreCase(properties.getProperty("local", Boolean.toString(local)));
     }
 
     private InputStream findEnvConfig() {
@@ -81,5 +88,9 @@ public final class GlobalConfiguration {
                 }
             })
             .orElseGet(() -> Thread.currentThread().getContextClassLoader().getResourceAsStream("environment-defaults.json"));
+    }
+
+    public void local(final boolean value) {
+        local = value;
     }
 }

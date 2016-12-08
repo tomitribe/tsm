@@ -35,13 +35,15 @@ public final class Ssh implements AutoCloseable {
 
     public Ssh(final SshKey sshKey, final String connection) {
         final JSch jsch = new JSch();
-        if (!sshKey.getPath().isFile()) {
-            throw new IllegalStateException("No key file provided, can't scp " + sshKey.getPath().getName() + ".");
-        }
-        try {
-            jsch.addIdentity(sshKey.getPath().getAbsolutePath(), sshKey.getPassword());
-        } catch (final JSchException e) {
-            throw new IllegalStateException(e);
+        if (sshKey != null && sshKey.getPath() != null) {
+            if (!sshKey.getPath().isFile()) {
+                throw new IllegalStateException("No key file provided, can't scp " + sshKey.getPath().getName() + ".");
+            }
+            try {
+                jsch.addIdentity(sshKey.getPath().getAbsolutePath(), sshKey.getPassword());
+            } catch (final JSchException e) {
+                throw new IllegalStateException(e);
+            }
         }
 
         final int at = connection.indexOf('@');
@@ -203,7 +205,8 @@ public final class Ssh implements AutoCloseable {
     }
 
     private static void waitForAck(final InputStream in) throws IOException {
-        switch (in.read()) {
+        final int read = in.read();
+        switch (read) {
             case -1:
                 throw new IllegalStateException("Server didnt respond.");
             case 0:

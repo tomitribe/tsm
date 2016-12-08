@@ -15,6 +15,8 @@ import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.Nexus;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.LocalExecution;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
 import com.tomitribe.tsm.file.TempDir;
 import lombok.NoArgsConstructor;
 import org.tomitribe.crest.api.Command;
@@ -47,7 +49,7 @@ public class TomEE {
     private static final String CENTRAL = "http://repo.maven.apache.org/maven2/";
     private static final String APACHE_SNAPSHOT = "https://repository.apache.org/content/repositories/snapshots/";
 
-    @Command(interceptedBy = DefaultParameters.class, usage = "tomee install application version")
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class}, usage = "tomee install application version")
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,

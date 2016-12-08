@@ -16,6 +16,8 @@ import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.LocalExecution;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
 import com.tomitribe.tsm.file.TempDir;
 import com.tomitribe.tsm.http.Http;
 import com.tomitribe.tsm.ssh.Ssh;
@@ -62,16 +64,16 @@ public class Java8 {
     private static final String JAVA8_SECURITY_ENFORCEMENT = "http://download.oracle.com/otn-pub/java/jce/8/jce_policy-8.zip";
     private static final String JAVA8_ARCHIVE = "http://www.oracle.com/technetwork/java/javase/downloads/java-archive-javase8-2177648.html";
 
-    @Command(value = "cryptography-extension", interceptedBy = DefaultParameters.class)
+    @Command(value = "cryptography-extension", interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void cryptographExtension(
-                               @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
-                               @Option("environment") final String inEnvironment,
-                               @Option("ssh.") final SshKey sshKey,
-                               final LocalFileRepository localFileRepository,
-                               final GitConfiguration git,
-                               final String application,
-                               final String version,
-                               @Out final PrintStream out) throws IOException, ScriptException {
+            @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+            @Option("environment") final String inEnvironment,
+            @Option("ssh.") final SshKey sshKey,
+            final LocalFileRepository localFileRepository,
+            final GitConfiguration git,
+            final String application,
+            final String version,
+            @Out final PrintStream out) throws IOException, ScriptException {
         // add security enforcement. Needed to use cipher TLS_RSA_WITH_AES_256_CBC_SHA256 for instance
 
         final File workDir = TempDir.newTempDir(workDirBase, "java8-cryptography-extension-install");
@@ -106,13 +108,13 @@ public class Java8 {
                     out.println("Deploying jce 8 on " + host + " for java " + version);
 
                     try (final Ssh ssh = new Ssh(
-                        // recreate a ssh key using global config
-                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
-                        Substitutors.resolveWithVariables(
-                            ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                            env.getProperties(),
-                            app.getProperties()
-                        ))) {
+                            // recreate a ssh key using global config
+                            new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                            Substitutors.resolveWithVariables(
+                                    ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                                    env.getProperties(),
+                                    app.getProperties()
+                            ))) {
 
                         final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
                         final String remoteWorkDir = fixedBase + "work-provisioning/";
@@ -120,10 +122,10 @@ public class Java8 {
                         final String securityFolder = fixedBase + "java/jdk-" + version + "/jre/lib/security/";
                         final String extractDir = remoteWorkDir + "/" + workDir.getName() + '/';
                         ssh.exec(String.format("mkdir -p \"%s\"", remoteWorkDir))
-                            .scp(destination, target, new ProgressBar(out, "Installing JCE on " + host))
-                            .exec(String.format("unzip \"%s\" -d \"%s\"", target, extractDir));
+                                .scp(destination, target, new ProgressBar(out, "Installing JCE on " + host))
+                                .exec(String.format("unzip \"%s\" -d \"%s\"", target, extractDir));
                         asList("US_export_policy.jar", "local_policy.jar")
-                            .forEach(jar -> ssh.exec(String.format("cp \"%s\" \"%s\"", extractDir + "UnlimitedJCEPolicyJDK8/US_export_policy.jar", securityFolder + jar)));
+                                .forEach(jar -> ssh.exec(String.format("cp \"%s\" \"%s\"", extractDir + "UnlimitedJCEPolicyJDK8/US_export_policy.jar", securityFolder + jar)));
                         ssh.exec(String.format("rm -Rf \"%s\" \"%s\"", target, extractDir));
 
                         out.println("JCE 8 setup in " + securityFolder + " for host " + host);
@@ -133,7 +135,7 @@ public class Java8 {
         }
     }
 
-    @Command(interceptedBy = DefaultParameters.class) // java8 install app1 8u60
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class}) // java8 install app1 8u60
     public static void install(@Option("architecture") @Default("linux-x64") final String architecture,
                                @Option("extension") @Default("tar.gz") final String extension,
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
@@ -161,16 +163,16 @@ public class Java8 {
                     final Document currentHtml = Jsoup.connect(listUrl).get();
 
                     final Optional<String> elt = currentHtml.select("script").stream()
-                        .map(Element::html)
-                        .filter(s -> s.contains("var downloads = new Array();"))
-                        .findAny();
+                            .map(Element::html)
+                            .filter(s -> s.contains("var downloads = new Array();"))
+                            .findAny();
 
                     if (elt.isPresent()) { // try archives
                         final Object result;
                         try {
                             final String cleanJs = asList(elt.get().split("\n")).stream()
-                                .filter(l -> l.trim().startsWith("downloads[") || l.trim().startsWith("var downloads"))
-                                .collect(Collectors.joining("\n"));
+                                    .filter(l -> l.trim().startsWith("downloads[") || l.trim().startsWith("var downloads"))
+                                    .collect(Collectors.joining("\n"));
                             result = engine.eval(cleanJs + "downloads;");
                         } catch (final ScriptException e) {
                             throw new IllegalArgumentException("Didnt manage to parse downloads in page " + listUrl, e);
@@ -184,9 +186,9 @@ public class Java8 {
                         if (map.containsKey(expectedKey)) {
                             try {
                                 return String.valueOf(Map.class.cast(Map.class.cast(Map.class.cast(map.get(expectedKey))
-                                    .get("files"))
-                                    .get("jdk-" + version + "-" + architecture + "." + extension))
-                                    .get("filepath"));
+                                        .get("files"))
+                                        .get("jdk-" + version + "-" + architecture + "." + extension))
+                                        .get("filepath"));
                             } catch (final ClassCastException e) {
                                 throw new IllegalArgumentException("Map downloads in page " + listUrl + " doesn't seem the expected one, update tsm please");
                             }
@@ -229,22 +231,22 @@ public class Java8 {
                     out.println("Deploying jdk " + version + " on " + host);
 
                     try (final Ssh ssh = new Ssh(
-                        // recreate a ssh key using global config
-                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
-                        Substitutors.resolveWithVariables(
-                            ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                            env.getProperties(),
-                            app.getProperties()
-                        ))) {
+                            // recreate a ssh key using global config
+                            new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(sshKey.getPassphrase())),
+                            Substitutors.resolveWithVariables(
+                                    ofNullable(env.getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                                    env.getProperties(),
+                                    app.getProperties()
+                            ))) {
 
                         final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
                         final String remoteWorkDir = fixedBase + "work-provisioning/";
                         final String target = remoteWorkDir + jdkDestination.getName();
                         final String jdkTargetFolder = fixedBase + "java/jdk-" + version + '/';
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, jdkTargetFolder))
-                            .scp(jdkDestination, target, new ProgressBar(out, "Installing JDK on " + host))
-                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, jdkTargetFolder))
-                            .exec(String.format("rm \"%s\"", target));
+                                .scp(jdkDestination, target, new ProgressBar(out, "Installing JDK on " + host))
+                                .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, jdkTargetFolder))
+                                .exec(String.format("rm \"%s\"", target));
 
                         out.println("JDK setup in " + jdkTargetFolder + " for host " + host);
                     }
@@ -259,11 +261,11 @@ public class Java8 {
         final String releaseSuffixMarker = " (public release)";
         try {
             Jsoup.connect(JAVA8_VERSIONS).get().select("div.orcl6w3 a")
-                .stream().filter(l -> l.text().endsWith(releaseSuffixMarker))
-                .forEach(link -> {
-                    final String text = link.text();
-                    lists.add(text.substring(0, text.length() - releaseSuffixMarker.length()).replace("JDK ", ""));
-                });
+                    .stream().filter(l -> l.text().endsWith(releaseSuffixMarker))
+                    .forEach(link -> {
+                        final String text = link.text();
+                        lists.add(text.substring(0, text.length() - releaseSuffixMarker.length()).replace("JDK ", ""));
+                    });
         } catch (final IOException e) {
             throw new IllegalStateException(JAVA8_VERSIONS + " not accessible");
         }

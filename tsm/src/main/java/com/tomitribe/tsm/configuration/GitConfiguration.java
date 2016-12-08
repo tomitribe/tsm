@@ -66,12 +66,12 @@ public class GitConfiguration {
     private boolean autoRevision;
 
     public GitConfiguration(
-        @Option("git.base") final String base,
-        @Option("git.repository") final String repo,
-        @Option("git.branch") @Default("master") final String branch,
-        @Option("git.revision") final String revision,
-        @Option("git.sshKey") final String sshKey,
-        @Option("git.sshPassphrase") final String sshPassphrase) {
+            @Option("git.base") final String base,
+            @Option("git.repository") final String repo,
+            @Option("git.branch") @Default("master") final String branch,
+            @Option("git.revision") final String revision,
+            @Option("git.sshKey") final String sshKey,
+            @Option("git.sshPassphrase") final String sshPassphrase) {
         this.base = base;
         this.repository = repo;
         this.branch = ofNullable(branch).orElse(HEAD);
@@ -82,31 +82,34 @@ public class GitConfiguration {
     }
 
     public void clone(final File checkoutDir, final Writer stdout) {
-        requireNonNull(repository, "git.repository needs to be set");
+        if (!base.startsWith("file:")) {
+            requireNonNull(repository, "git.repository needs to be set");
+        }
+
         final boolean hasPassphrase = hasPassphrase();
         try {
             final CloneCommand cloneCommand = Git.cloneRepository()
-                .setBranch(branch)
-                .setURI(repository())
-                .setDirectory(checkoutDir)
-                .setProgressMonitor(new TextProgressMonitor(stdout))
-                .setTransportConfigCallback(newTransportConfigCallback(jSch -> {
-                    if (new File(sshKey).isFile()) {
-                        if (hasPassphrase) {
-                            try {
-                                jSch.addIdentity(sshKey, sshPassphrase);
-                            } catch (final JSchException e) {
-                                throw new IllegalStateException(e);
+                    .setBranch(branch)
+                    .setURI(repository())
+                    .setDirectory(checkoutDir)
+                    .setProgressMonitor(new TextProgressMonitor(stdout))
+                    .setTransportConfigCallback(newTransportConfigCallback(jSch -> {
+                        if (new File(sshKey).isFile()) {
+                            if (hasPassphrase) {
+                                try {
+                                    jSch.addIdentity(sshKey, sshPassphrase);
+                                } catch (final JSchException e) {
+                                    throw new IllegalStateException(e);
+                                }
+                            } else {
+                                try {
+                                    jSch.addIdentity(sshKey);
+                                } catch (final JSchException e) {
+                                    throw new IllegalStateException(e);
+                                }
                             }
-                        } else {
-                            try {
-                                jSch.addIdentity(sshKey);
-                            } catch (final JSchException e) {
-                                throw new IllegalStateException(e);
-                            }
-                        }
-                    } // else handled by jgit
-                }));
+                        } // else handled by jgit
+                    }));
             if (hasPassphrase) {
                 cloneCommand.setCredentialsProvider(newCredentialsProvider());
             }
@@ -137,8 +140,8 @@ public class GitConfiguration {
             @Override
             public boolean supports(final CredentialItem... items) {
                 return filterPassphrase(items)
-                    .findAny()
-                    .isPresent();
+                        .findAny()
+                        .isPresent();
             }
 
             @Override
@@ -149,8 +152,8 @@ public class GitConfiguration {
 
             private Stream<CredentialItem> filterPassphrase(final CredentialItem[] items) {
                 return asList(ofNullable(items).orElse(new CredentialItem[0])).stream()
-                    .filter(CredentialItem.StringType.class::isInstance)
-                    .filter(st -> st.getPromptText().toLowerCase(Locale.ENGLISH).startsWith("passphrase for"));
+                        .filter(CredentialItem.StringType.class::isInstance)
+                        .filter(st -> st.getPromptText().toLowerCase(Locale.ENGLISH).startsWith("passphrase for"));
             }
         };
     }

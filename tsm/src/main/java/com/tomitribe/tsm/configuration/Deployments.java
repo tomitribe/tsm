@@ -9,6 +9,7 @@
  */
 package com.tomitribe.tsm.configuration;
 
+import com.tomitribe.tsm.ssh.EmbeddedSshServer;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -23,6 +24,7 @@ import java.util.Map;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 
@@ -46,20 +48,20 @@ public interface Deployments {
         public Collection<ContextualEnvironment> findEnvironments(final String inEnvironment) {
             if ("*".equals(inEnvironment)) {
                 return environments.stream()
-                    .flatMap(e ->
-                            ofNullable(e.getNames()).orElse(emptyList()).stream()
-                                .map(n -> new ContextualEnvironment(n, e)).collect(toList()).stream()
-                    ).collect(toList());
+                        .flatMap(e ->
+                                ofNullable(e.getNames()).orElse(emptyList()).stream()
+                                        .map(n -> new ContextualEnvironment(n, e)).collect(toList()).stream()
+                        ).collect(toList());
             }
             return stream(inEnvironment.split(" *, *")).map(environment -> {
                 final Environment reduce = ofNullable(environments).orElse(emptyList()).stream()
-                    .filter(e -> ofNullable(e.getNames()).orElse(emptyList()).contains(environment))
-                    .reduce(null, (a, b) -> {
-                        if (a == null && b != null) {
-                            return b;
-                        }
-                        throw new IllegalArgumentException("Environment " + environment + " defined multiple times in deployments.json");
-                    });
+                        .filter(e -> ofNullable(e.getNames()).orElse(emptyList()).contains(environment))
+                        .reduce(null, (a, b) -> {
+                            if (a == null && b != null) {
+                                return b;
+                            }
+                            throw new IllegalArgumentException("Environment " + environment + " defined multiple times in deployments.json");
+                        });
                 if (reduce == null) {
                     throw new IllegalArgumentException("No environment " + environment + ".");
                 }
@@ -70,7 +72,14 @@ public interface Deployments {
         private void init() {
             ofNullable(environments).orElse(emptyList()).forEach(envrt -> {
                 if (ofNullable(envrt.getHosts()).orElse(emptyList()).isEmpty()) {
-                    throw new IllegalArgumentException("No host for " + envrt);
+                    final org.tomitribe.crest.environments.Environment environment = org.tomitribe.crest.environments.Environment.ENVIRONMENT_THREAD_LOCAL.get();
+                    if (environment.findService(GlobalConfiguration.class).isLocal()) {
+                        final EmbeddedSshServer service = environment.findService(EmbeddedSshServer.class);
+                        service.start();
+                        envrt.setHosts(new ArrayList<>(singletonList(service.getUrl())));
+                    } else {
+                        throw new IllegalArgumentException("No host for " + envrt);
+                    }
                 }
 
                 // libs/webapps/base/user are merged there == inheritance
@@ -190,10 +199,10 @@ public interface Deployments {
 
     static Application read(final java.io.Reader stream) {
         final Application application = new MapperBuilder()
-            .setSupportsComments(true)
-            .setAccessModeName("field")
-            .build()
-            .readObject(stream, Application.class);
+                .setSupportsComments(true)
+                .setAccessModeName("field")
+                .build()
+                .readObject(stream, Application.class);
         application.init();
         return application;
     }

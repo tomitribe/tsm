@@ -14,6 +14,8 @@ import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.LocalExecution;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
 import lombok.NoArgsConstructor;
 import org.tomitribe.crest.api.Command;
 import org.tomitribe.crest.api.Default;
@@ -30,7 +32,7 @@ import static lombok.AccessLevel.PRIVATE;
 @Command("tag")
 @NoArgsConstructor(access = PRIVATE)
 public class Tag {
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
@@ -43,8 +45,8 @@ public class Tag {
                                @Out final PrintStream out,
                                final GlobalConfiguration configuration) throws IOException, ScriptException {
         ContainerBase.tribestreamInstall("TAG",
-            "com.tomitribe.tribestream", "tribestream-access-gateway", null,
-            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
+                "com.tomitribe.tribestream", "tribestream-access-gateway", null,
+                workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
     }
 
     @Command(interceptedBy = DefaultParameters.class)

@@ -15,6 +15,8 @@ import com.tomitribe.tsm.configuration.GitConfiguration;
 import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.configuration.LocalFileRepository;
 import com.tomitribe.tsm.configuration.SshKey;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.tomitribe.crest.environments.Environment;
@@ -44,6 +46,16 @@ public class NodeTest {
 
     @Rule
     public final GitRule git = new GitRule("target/NodeTest-git/", ssh::getUsername, ssh::port);
+
+    @Before
+    public void init() {
+        Environment.ENVIRONMENT_THREAD_LOCAL.set(ENVIRONMENT);
+    }
+
+    @After
+    public void reset() {
+        Environment.ENVIRONMENT_THREAD_LOCAL.remove();
+    }
 
     @Test
     public void install() throws IOException {

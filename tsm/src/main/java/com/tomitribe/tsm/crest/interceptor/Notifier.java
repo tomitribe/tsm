@@ -9,6 +9,7 @@
  */
 package com.tomitribe.tsm.crest.interceptor;
 
+import com.tomitribe.tsm.configuration.GlobalConfiguration;
 import com.tomitribe.tsm.listener.Listeners;
 import lombok.NoArgsConstructor;
 import org.tomitribe.crest.api.Option;
@@ -32,6 +33,11 @@ import static lombok.AccessLevel.PRIVATE;
 public class Notifier {
     @CrestInterceptor
     public static Object intercept(final CrestContext context) throws Throwable {
+        if (Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(GlobalConfiguration.class).isLocal()) {
+            // skip notif for local deployments
+            return context.proceed();
+        }
+
         final String id = UUID.randomUUID().toString();
         final Method method = context.getMethod();
         String constantText = context.getName();

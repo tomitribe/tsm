@@ -17,6 +17,8 @@ import com.tomitribe.tsm.configuration.SshKey;
 import com.tomitribe.tsm.configuration.Substitutors;
 import com.tomitribe.tsm.console.ProgressBar;
 import com.tomitribe.tsm.crest.interceptor.DefaultParameters;
+import com.tomitribe.tsm.crest.interceptor.LocalExecution;
+import com.tomitribe.tsm.crest.interceptor.Notifier;
 import com.tomitribe.tsm.file.TempDir;
 import com.tomitribe.tsm.http.Http;
 import com.tomitribe.tsm.ssh.Ssh;
@@ -43,7 +45,7 @@ import static lombok.AccessLevel.PRIVATE;
 @Command("node")
 @NoArgsConstructor(access = PRIVATE)
 public class Node {
-    @Command(interceptedBy = DefaultParameters.class)
+    @Command(interceptedBy = {DefaultParameters.class, Notifier.class, LocalExecution.class})
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String inEnvironment,
                                @Option("ssh.") final SshKey sshKey,
@@ -52,7 +54,7 @@ public class Node {
                                @Option("classifier") @Default("linux-x64") final String classifier,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
-                               final String application,
+                               @Notifier.Description final String application,
                                @Out final PrintStream out,
                                final GlobalConfiguration configuration) throws IOException {
         final File workDir = TempDir.newTempDir(workDirBase, application + "_node_install");
