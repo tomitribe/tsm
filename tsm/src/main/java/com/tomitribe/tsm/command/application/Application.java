@@ -47,6 +47,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -524,6 +525,7 @@ public class Application {
                 final Collection<File> additionalLibs = new LinkedList<>();
                 final Map<String, File> additionalCustomLibs = new TreeMap<>();
                 final Map<String, File> additionalWebapps = new TreeMap<>();
+                final Map<String, File> additionalApps = new TreeMap<>();
                 final AtomicReference<String[]> singleWebapp = new AtomicReference<>(); // reused if we have a single webapp, don't parse N times
                 if (nexusLib != null) {
                     ofNullable(env.getLibs()).orElse(emptyList()).forEach(lib -> additionalLibs.add(findLib(nexus, nexusLib, out, workDir, lib)));
@@ -535,27 +537,9 @@ public class Application {
                         final File local = new File(workDir, segments[1] + "-" + segments[2] +
                                 ofNullable(segments.length >= 5 ? segments[4] : null).map(c -> '-' + c).orElse("") + ".war");
                         if (!local.isFile()) {
-                            final String gId = segments[0];
-                            final String aId = segments[1];
-                            final String aVersion = segments[2];
                             final String aType = segments.length >= 4 ? segments[3] : "war";
                             final String aClassifier = segments.length >= 5 ? segments[4] : null;
-                            try {
-                                final File m2Local = localFileRepository.find(gId, aId, aVersion, aClassifier, aType);
-                                if (m2Local.isFile()) {
-                                    try {
-                                        IO.copy(m2Local, local);
-                                    } catch (final IOException e) {
-                                        nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
-                                    }
-                                } else {
-                                    nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
-                                }
-                            } catch (final IllegalStateException ise) {
-                                if (nexus != null) {
-                                    nexus.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
-                                }
-                            }
+                            doDownload(nexus, nexusLib, localFileRepository, out, local, segments[0], segments[1], segments[2], aType, aClassifier);
                         }
                         singleWebapp.set(segments);
 
@@ -565,6 +549,22 @@ public class Application {
                     if (additionalWebapps.size() > 1) {
                         singleWebapp.set(null);
                     }
+
+                    ofNullable(env.getApps()).orElse(emptyList()).forEach(a -> {
+                        final String[] segments = a.replaceAll("\\?.*", "").split(":");
+                        final int nameIdx = a.indexOf("?rename=");
+
+                        final File local = new File(workDir, segments[1] + "-" + segments[2] +
+                                ofNullable(segments.length >= 5 ? segments[4] : null).map(c -> '-' + c).orElse("") + segments[3]);
+                        if (!local.isFile()) {
+                            final String aClassifier = segments.length >= 5 ? segments[4] : null;
+                            // ear? rar? jar? we don't know so we don't guess like we do for wars.
+                            doDownload(nexus, nexusLib, localFileRepository, out, local, segments[0], segments[1], segments[2], segments[3], aClassifier);
+                        }
+
+                        final String name = (nameIdx > 0 ? a.substring(nameIdx + "?rename=".length()) : segments[1]) + "." + segments[3];
+                        additionalApps.put(name, local);
+                    });
                 }
 
                 final AtomicReference<String> chosenServerVersion = new AtomicReference<>(
@@ -612,7 +612,9 @@ public class Application {
                         // create the structure if needed
                         ssh.exec(String.format("mkdir -p \"%s\"", targetFolder))
                                 // create app structure
-                                .exec("cd \"" + targetFolder + "\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done");
+                                .exec("cd \"" + targetFolder + "\" && for i in " +
+                                        (env.getApps().isEmpty() ? "" : "apps ") +
+                                        "bin conf lib logs temp webapps work; do mkdir -p $i; done");
 
                         if (downloadedFile != null) {
                             ssh.scp(
@@ -632,11 +634,13 @@ public class Application {
                             ssh.scp(file, finalFilePath, new ProgressBar(out, "Uploading " + file.getName()));
                         });
                         additionalWebapps.forEach((name, war) -> ssh.scp(war, targetFolder + "webapps/" + name + ".war", new ProgressBar(out, "Uploading " + war.getName())));
+                        additionalApps.forEach((name, ar) -> ssh.scp(ar, targetFolder + "apps/" + name, new ProgressBar(out, "Uploading " + ar.getName())));
 
                         // synchronizing configuration
                         final List<File> foldersToSyncs = new LinkedList<>();
                         final String envFolder = envFolder(env, envName);
                         final List<String> configFolders = asList("tomee", "tomee-" + envFolder, "tribestream", "tribestream-" + envFolder);
+                        final AtomicBoolean hasTomEEXml = new AtomicBoolean(false);
                         configFolders.forEach(folder -> {
                             final File foldersToSync = new File(deploymentConfig.get().getParentFile(), folder);
                             if (foldersToSync.isDirectory()) {
@@ -646,7 +650,25 @@ public class Application {
                             } else {
                                 out.println("No '" + folder + "' configuration folder found.");
                             }
+                            if (!hasTomEEXml.get()) {
+                                hasTomEEXml.set(foldersToSyncs.stream().map(f -> new File(f, "conf/tomee.xml")).anyMatch(File::isFile));
+                            }
                         });
+
+                        if (!hasTomEEXml.get() && !env.getApps().isEmpty()) { // create one - note we ignore the system.properties declaration for now
+                            final File tmp = new File(workDir, "tomee-apps.xml");
+                            try {
+                                IO.writeString(tmp,
+                                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                                        "<tomee>\n" +
+                                        "  <Deployments dir=\"apps\" />\n" +
+                                        "</tomee>\n" +
+                                        "\n");
+                            } catch (final IOException e) {
+                                throw new IllegalStateException(e);
+                            }
+                            ssh.scp(tmp, targetFolder + "conf/tomee.xml", new ProgressBar(out, "Uploading tomee.xml (for apps/)"));
+                        }
 
                         Collections.reverse(foldersToSyncs);
 
@@ -841,6 +863,28 @@ public class Application {
         }
     }
 
+    private static void doDownload(final Nexus nexus, final Nexus nexusLib,
+                                   final LocalFileRepository localFileRepository,
+                                   final PrintStream out, final File local,
+                                   final String gId, final String aId, final String aVersion, final String aType, final String aClassifier) {
+        try {
+            final File m2Local = localFileRepository.find(gId, aId, aVersion, aClassifier, aType);
+            if (m2Local.isFile()) {
+                try {
+                    IO.copy(m2Local, local);
+                } catch (final IOException e) {
+                    nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
+                }
+            } else {
+                nexusLib.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
+            }
+        } catch (final IllegalStateException ise) {
+            if (nexus != null) {
+                nexus.download(out, gId, aId, aVersion, aClassifier, aType).to(local);
+            }
+        }
+    }
+
     private static File findLib(final Nexus nexus, final Nexus nexusLib, final PrintStream out, final File workDir, final String lib) {
         final String[] segments = lib.split(":");
         final File local = new File(workDir, segments[1] + ".jar");
@@ -907,7 +951,13 @@ public class Application {
     private static void filterAndRewrite(final File file, final Deployments.Application application, final Deployments.Environment environment) { // rewrite the file filtered
         try {
             final String content = IO.slurp(file);
-            final String newContent = Substitutors.resolveWithVariables(content, environment.getProperties(), application.getProperties());
+            String newContent = Substitutors.resolveWithVariables(content, environment.getProperties(), application.getProperties());
+
+            // if we need to deploy apps ensure apps folder is deployed
+            if ("tomee.xml".equals(file.getName()) && !environment.getApps().isEmpty() && (!newContent.contains("<Deployments") || !newContent.contains("dir=\"apps\""))) {
+                newContent = newContent.replace("</tomee>", "") + "\n<Deployments dir=\"apps\" />\n</tomee>\n";
+            }
+
             if (!newContent.equals(content)) {
                 IO.writeString(file, newContent);
             }
@@ -930,7 +980,7 @@ public class Application {
                                       final String... name) {
         final List<String> names = asList(name);
         final Map<String, List<String>> versionByName = new HashMap<>();
-        names.forEach(server -> of(asList(capture(() -> ssh.exec("ls \"" + fixedBase + (useNames ? server + "/\"" : ""))).split("\\n+")).stream()
+        names.forEach(server -> of(Arrays.stream(capture(() -> ssh.exec("ls \"" + fixedBase + (useNames ? server + "/\"" : ""))).split("\\n+"))
                 .filter(v -> v != null && v.startsWith(server + '-'))
                 .map(v -> v.substring(server.length() + 1 /* 1 = '-' length */))
                 .collect(toList()))

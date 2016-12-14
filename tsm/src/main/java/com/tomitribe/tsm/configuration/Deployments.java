@@ -40,6 +40,7 @@ public interface Deployments {
         private Map<String, String> customLibs;
         private Collection<String> libs;
         private Collection<String> webapps;
+        private Collection<String> apps;
         private String base;
         private String user;
         private String groupId;
@@ -106,6 +107,9 @@ public interface Deployments {
                 if (envrt.getWebapps() == null) {
                     envrt.setWebapps(webapps);
                 }
+                if (envrt.getApps() == null) {
+                    envrt.setApps(apps);
+                }
                 if (envrt.getLibs() == null) {
                     envrt.setLibs(new ArrayList<>());
                 }
@@ -114,6 +118,9 @@ public interface Deployments {
                 }
                 if (envrt.getWebapps() == null) {
                     envrt.setWebapps(new ArrayList<>());
+                }
+                if (envrt.getApps() == null) {
+                    envrt.setApps(new ArrayList<>());
                 }
 
                 // coordinates
@@ -163,6 +170,7 @@ public interface Deployments {
             environmentCopy.setCustomLibs(new HashMap<>(environment.getCustomLibs()));
             environmentCopy.setLibs(new ArrayList<>(environment.getLibs()));
             environmentCopy.setWebapps(new ArrayList<>(environment.getWebapps()));
+            environmentCopy.setApps(new ArrayList<>(environment.getApps()));
             environmentCopy.setNames(new ArrayList<>(environment.getNames()));
             environmentCopy.setHosts(new ArrayList<>(environment.getHosts()));
             environmentCopy.setBase(environment.getBase());
@@ -187,6 +195,7 @@ public interface Deployments {
         private Map<String, String> customLibs;
         private Collection<String> libs;
         private Collection<String> webapps;
+        private Collection<String> apps;
         private Collection<String> names;
         private Collection<String> hosts;
         private String classpath;

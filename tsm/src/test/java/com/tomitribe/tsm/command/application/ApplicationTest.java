@@ -63,6 +63,8 @@ public class ApplicationTest {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/art2/other", p).mkdirs());
         } else if (cmd.equals("cd \"/configonly/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configonly/prod", p).mkdirs());
+        } else if (cmd.equals("cd \"/configonly_apps/prod/\" && for i in apps bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
+            asList("apps", "bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configonly_apps/prod", p).mkdirs());
         }
     });
 
@@ -354,7 +356,6 @@ public class ApplicationTest {
         assertTrue(msg.get(1).endsWith(" Executed (environment=testenv) install 'art', status=SUCCESS"));
     }
 
-
     @Test
     public void configOnlyOneWebapp() throws Throwable {
         git.addFile(
@@ -429,6 +430,87 @@ public class ApplicationTest {
                         "    \"version\":\"8u112\"\n" +
                         "  }\n" +
                         "}\n");
+    }
+
+    @Test
+    public void configOnlyApps() throws Throwable {
+        git.addFile(
+                "configonly_apps/deployments.json",
+                "{\"environments\":[{" +
+                        "\"hosts\":[\"localhost:" + git.getSshPort() + "\"]," +
+                        "\"apps\": [\"com.company:superar:0.1.2:rar?rename=test\"]," +
+                        "\"names\":[\"prod\"]," +
+                        "\"base\":\"/\"," +
+                        "\"user\":\"" + git.getSshUser() + "\"" +
+                        "}]}");
+
+        Application.installConfigOnly(
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new GitConfiguration(git.directory(), "ApplicationTest-configOnlyApps", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+                new LocalFileRepository(new File("target/missing")),
+                new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+                new File("target/ApplicationTest-configonly-apps-work/"),
+                "7.0.1", null, "8u112", "prod", "configonly_apps", -1, -1, new Duration("-1 minutes"), false, false,
+                new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
+
+        assertEquals("lib => com.company:superar:0.1.2:rar", IO.slurp(new File(ssh.getHome(), "configonly_apps/prod/apps/test.rar")).trim());
+        assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<tomee>\n" +
+                "  <Deployments dir=\"apps\" />\n" +
+                "</tomee>", IO.slurp(new File(ssh.getHome(), "configonly_apps/prod/conf/tomee.xml")).trim());
+
+        final String meta = IO.slurp(new File(ssh.getHome(), "configonly_apps/prod/conf/tsm-metadata.json"))
+                .replaceAll("\"date\":\"[^\"]*\"", "\"date\":\"DATE\"")
+                .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"")
+                .replace("\n\r", "\n");
+        assertEquals("{\n" +
+                "  \"date\":\"DATE\",\n" +
+                "  \"host\":\"localhost:" + ssh.port() + "\",\n" +
+                "  \"environment\":\"prod\",\n" +
+                "  \"application\":{\n" +
+                "    \"groupId\":\"\",\n" +
+                "    \"artifactId\":\"configonly_apps\",\n" +
+                "    \"version\":\"\",\n" +
+                "    \"originalArtifact\":\"configonly_apps\"\n" +
+                "  },\n" +
+                "  \"git\":{\n" +
+                "    \"branch\":\"master\",\n" +
+                "    \"revision\":\"REV\"\n" +
+                "  },\n" +
+                "  \"server\":{\n" +
+                "    \"name\":\"apache-tomee-7.0.1\"\n" +
+                "  },\n" +
+                "  \"java\":{\n" +
+                "    \"version\":\"8u112\"\n" +
+                "  }\n" +
+                "}", meta.trim());
     }
 
     @Test

@@ -18,6 +18,7 @@ Romain Manni-Bucau
     "libs": ["...", "..."], <1>
     "customLibs": {"bin/foo.jar": "..."}, <1>
     "webapps": ["...", "..."], <1>
+    "apps": ["...", "..."], <1>
     "properties": {
         "...": "...",
         "...": "..."
@@ -36,6 +37,7 @@ Romain Manni-Bucau
         "libs": ["...", "..."], <1>
         "customLibs": {"...":"..."}, <1>
         "webapps": ["...", "..."], <1>
+        "apps": ["...", "..."], <1>
         "properties": {
             "...": "...",
             "...": "..."
@@ -52,4 +54,4 @@ Romain Manni-Bucau
 }
 ----
 
-<1> values are maven coordinates with this format: `groupId:artifactId:version`.
+<1> values are maven coordinates with this format: `groupId:artifactId:version` excepted for `apps` which also requires the type to be appended.
