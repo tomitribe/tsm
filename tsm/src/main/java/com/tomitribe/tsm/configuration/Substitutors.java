@@ -15,6 +15,7 @@ import org.tomitribe.crest.environments.Environment;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
@@ -32,9 +33,9 @@ public interface Substitutors {
                 return ofNullable(ofNullable(property)
                     .orElseGet(() ->
                         ofNullable(vars).map(Arrays::asList).orElse(emptyList()).stream()
-                            .filter(m -> m != null)
+                            .filter(Objects::nonNull)
                             .map(m -> m.get(key))
-                            .filter(v -> v != null)
+                            .filter(Objects::nonNull)
                             .findFirst().orElse(null)))
                     .orElseGet(() -> ofNullable(Environment.ENVIRONMENT_THREAD_LOCAL.get().findService(GlobalConfiguration.class)).map(c -> c.read(key)).orElse(null));
             }

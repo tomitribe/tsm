@@ -65,6 +65,8 @@ public class ApplicationTest {
             asList("bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configonly/prod", p).mkdirs());
         } else if (cmd.equals("cd \"/configonly_apps/prod/\" && for i in apps bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
             asList("apps", "bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configonly_apps/prod", p).mkdirs());
+        } else if (cmd.equals("cd \"/configOnlyOneWebappFiltering/prod/\" && for i in bin conf lib logs temp webapps work; do mkdir -p $i; done")) {
+            asList("apps", "bin", "conf", "webapps").forEach(p -> new File("target/ApplicationTest/configOnlyOneWebappFiltering/prod", p).mkdirs());
         }
     });
 
@@ -425,6 +427,83 @@ public class ApplicationTest {
                         "  },\n" +
                         "  \"server\":{\n" +
                         "    \"name\":\"apache-tomee-7.0.1\"\n" +
+                        "  },\n" +
+                        "  \"java\":{\n" +
+                        "    \"version\":\"8u112\"\n" +
+                        "  }\n" +
+                        "}\n");
+    }
+
+    @Test
+    public void configOnlyOneWebappFiltering() throws Throwable {
+        git.addFile(
+                "configOnlyOneWebappFiltering/deployments.json",
+                "{\"environments\":[{" +
+                        "\"hosts\":[\"localhost:" + git.getSshPort() + "\"]," +
+                        "\"webapps\": [\"com.company:superart:${app.version}?context=super\"]," +
+                        "\"properties\": {\"app.version\":\"0.1.2\"}," +
+                        "\"names\":[\"prod\"]," +
+                        "\"base\":\"/\"," +
+                        "\"user\":\"" + git.getSshUser() + "\"" +
+                        "}]}");
+
+        Application.installConfigOnly(
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "main => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new Nexus("http://faked", null, null) {
+                    @Override
+                    public DownloadHandler download(final PrintStream out,
+                                                    final String groupId, final String artifactId, final String version,
+                                                    final String classifier, final String type) {
+                        return destination -> {
+                            try {
+                                IO.writeString(destination, "lib => " + groupId + ":" + artifactId + ":" + version + ":" + type);
+                            } catch (final IOException e) {
+                                fail(e.getMessage());
+                            }
+                        };
+                    }
+                },
+                new GitConfiguration(git.directory(), "ApplicationTest-configOnlyOneWebappFiltering", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
+                new LocalFileRepository(new File("target/missing")),
+                new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
+                new File("target/ApplicationTest-configonly-onewebapp-filtering-work/"),
+                "7.0.2", null, "8u112", "prod", "configOnlyOneWebappFiltering", -1, -1, new Duration("-1 minutes"), false, false,
+                new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
+
+        final String meta = IO.slurp(new File(ssh.getHome(), "configOnlyOneWebappFiltering/prod/conf/tsm-metadata.json"))
+                .replaceAll("\"date\":\"[^\"]*\"", "\"date\":\"DATE\"")
+                .replaceAll("\"revision\":\"[^\"]*\"", "\"revision\":\"REV\"")
+                .replace("\n\r", "\n");
+        assertEquals(meta,
+                "{\n" +
+                        "  \"date\":\"DATE\",\n" +
+                        "  \"host\":\"localhost:" + ssh.port() + "\",\n" +
+                        "  \"environment\":\"prod\",\n" +
+                        "  \"application\":{\n" +
+                        "    \"groupId\":\"com.company\",\n" +
+                        "    \"artifactId\":\"configOnlyOneWebappFiltering\",\n" +
+                        "    \"version\":\"0.1.2\",\n" +
+                        "    \"originalArtifact\":\"superart\"\n" +
+                        "  },\n" +
+                        "  \"git\":{\n" +
+                        "    \"branch\":\"master\",\n" +
+                        "    \"revision\":\"REV\"\n" +
+                        "  },\n" +
+                        "  \"server\":{\n" +
+                        "    \"name\":\"apache-tomee-7.0.2\"\n" +
                         "  },\n" +
                         "  \"java\":{\n" +
                         "    \"version\":\"8u112\"\n" +

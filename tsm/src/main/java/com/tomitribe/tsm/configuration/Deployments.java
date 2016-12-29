@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.johnzon.mapper.MapperBuilder;
 
 import java.util.ArrayList;
@@ -27,6 +29,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public interface Deployments {
     @Data
@@ -185,6 +188,25 @@ public interface Deployments {
                 resetEnvironment();
             }
             return environmentCopy;
+        }
+
+        public void selfFiltering(final Application application) {
+            environmentCopy.setApps(environmentCopy.getApps().stream()
+                    .map(a -> Substitutors.resolveWithVariables(a, environment.getProperties(), application.getProperties()))
+                    .collect(toList()));
+            environmentCopy.setWebapps(environmentCopy.getWebapps().stream()
+                    .map(a -> Substitutors.resolveWithVariables(a, environment.getProperties(), application.getProperties()))
+                    .collect(toList()));
+            environmentCopy.setLibs(environmentCopy.getLibs().stream()
+                    .map(a -> Substitutors.resolveWithVariables(a, environment.getProperties(), application.getProperties()))
+                    .collect(toList()));
+            environmentCopy.setCustomLibs(environmentCopy.getCustomLibs().entrySet().stream()
+                    .map(e -> ImmutablePair.of(e.getKey(), Substitutors.resolveWithVariables(e.getValue(), environment.getProperties(), application.getProperties())))
+                    .collect(toMap(Pair::getKey, Pair::getValue)));
+            ofNullable(environment.getVersion())
+                    .ifPresent(v -> environmentCopy.setVersion(Substitutors.resolveWithVariables(v, environment.getProperties(), application.getProperties())));
+            ofNullable(environment.getClasspath())
+                    .ifPresent(c -> environmentCopy.setClasspath(Substitutors.resolveWithVariables(c, environment.getProperties(), application.getProperties())));
         }
     }
 

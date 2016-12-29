@@ -203,6 +203,7 @@ public class Application {
                 contextualEnvironment.resetEnvironment();
                 validateEnvironment(artifactId, contextualEnvironment);
                 overrideDefaultProperties(crestEnv, artifactId, contextualEnvironment);
+                contextualEnvironment.selfFiltering(app);
 
                 final Deployments.Environment env = contextualEnvironment.getEnvironment();
 
@@ -510,6 +511,7 @@ public class Application {
                 contextualEnvironment.resetEnvironment();
                 validateEnvironment(inArtifactId, contextualEnvironment);
                 overrideDefaultProperties(crestEnv, inArtifactId, contextualEnvironment);
+                contextualEnvironment.selfFiltering(app);
 
                 final String envName = contextualEnvironment.getName();
                 final Deployments.Environment env = contextualEnvironment.getEnvironment();
