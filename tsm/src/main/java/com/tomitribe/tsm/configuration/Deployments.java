@@ -9,6 +9,7 @@
  */
 package com.tomitribe.tsm.configuration;
 
+import com.tomitribe.tsm.metadata.Build;
 import com.tomitribe.tsm.ssh.EmbeddedSshServer;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -33,7 +34,13 @@ import static java.util.stream.Collectors.toMap;
 
 public interface Deployments {
     @Data
+    class Tsm {
+        private String version;
+    }
+
+    @Data
     class Application {
+        private Tsm tsm;
         private final String name;
         private final Map<String, String> properties;
         private Map<String, List<String>> byHostProperties;
@@ -154,6 +161,15 @@ public interface Deployments {
                 }));
             });
         }
+
+        public void checkVersion() {
+            if (tsm == null || tsm.getVersion() == null || tsm.getVersion().trim().isEmpty()) {
+                return;
+            }
+            if (!tsm.getVersion().matches(Build.VERSION)) {
+                throw new IllegalStateException("Current TSM is '" + Build.VERSION + "' but expecting to match '" + tsm.getVersion() + "'");
+            }
+        }
     }
 
     @Data
@@ -234,6 +250,7 @@ public interface Deployments {
                 .setAccessModeName("field")
                 .build()
                 .readObject(stream, Application.class);
+        application.checkVersion();
         application.init();
         return application;
     }

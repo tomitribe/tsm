@@ -10,6 +10,9 @@ Romain Manni-Bucau
 [source]
 ----
 {
+    "tsm": {
+        "version": "..."
+    },
     "user": "...",
     "base": "...",
     "groupId": "...",
