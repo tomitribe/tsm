@@ -53,20 +53,21 @@ import static java.util.Optional.ofNullable;
 
 class ContainerBase {
     static void tribestreamInstall(final String displayName,
-                        final String groupId,
-                        final String artifactId,
-                        final String classifier,
-                        final File workDirBase,
-                        final String inEnvironment,
-                        final SshKey sshKey,
-                        final TomitribeTribestreamMetadataPrincipal security,
-                        final LocalFileRepository localFileRepository,
-                        final GitConfiguration git,
-                        final String application,
-                        final String version,
-                        final PrintStream out,
-                        final GlobalConfiguration configuration,
-                        final String baseUrl) throws IOException, ScriptException {
+                                   final String groupId,
+                                   final String artifactId,
+                                   final String classifier,
+                                   final File workDirBase,
+                                   final String inEnvironment,
+                                   final SshKey sshKey,
+                                   final TomitribeTribestreamMetadataPrincipal security,
+                                   final LocalFileRepository localFileRepository,
+                                   final GitConfiguration git,
+                                   final String application,
+                                   final String version,
+                                   final PrintStream out,
+                                   final GlobalConfiguration configuration,
+                                   final String baseUrl,
+                                   final String subFolder) throws IOException, ScriptException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId + "-install");
 
         final File downloadedFile = new File(workDir, artifactId + "-" + version + ".tar.gz");
@@ -88,22 +89,22 @@ class ContainerBase {
                     try {
                         final SSLContext context = SSLContext.getInstance("SSL");
                         context.init(null, new TrustManager[]{
-                            new X509TrustManager() {
-                                @Override
-                                public void checkClientTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
-                                    // no-op
-                                }
+                                new X509TrustManager() {
+                                    @Override
+                                    public void checkClientTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
+                                        // no-op
+                                    }
 
-                                @Override
-                                public void checkServerTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
-                                    // no-op
-                                }
+                                    @Override
+                                    public void checkServerTrusted(final X509Certificate[] x509Certificates, final String s) throws CertificateException {
+                                        // no-op
+                                    }
 
-                                @Override
-                                public X509Certificate[] getAcceptedIssuers() {
-                                    return null;
+                                    @Override
+                                    public X509Certificate[] getAcceptedIssuers() {
+                                        return null;
+                                    }
                                 }
-                            }
                         }, new SecureRandom());
                         httpsURLConnection.setSSLSocketFactory(context.getSocketFactory());
                     } catch (final Exception e) {
@@ -118,13 +119,13 @@ class ContainerBase {
             }
             out.println("Downloading " + displayName + ", please wait...");
             new Http().download(
-                "https://www.tomitribe.com/downloads/api/catalog/get/" + pathWithVersion + "?token=" + token, downloadedFile,
-                null /* don't use new ProgressBar(out, "Downloading Tribestream " + version) since we don't have Content-Length for now here */);
+                    "https://www.tomitribe.com/downloads/api/catalog/get/" + pathWithVersion + "?token=" + token, downloadedFile,
+                    null /* don't use new ProgressBar(out, "Downloading Tribestream " + version) since we don't have Content-Length for now here */);
         }
         out.println("Downloaded " + displayName + " in " + downloadedFile + " (" + new Size(downloadedFile.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
 
         try {
-            doInstall(displayName, artifactId, inEnvironment, sshKey, git, application, version, out, configuration, workDir, downloadedFile);
+            doInstall(displayName, artifactId, inEnvironment, sshKey, git, application, version, out, configuration, workDir, downloadedFile, subFolder);
         } finally {
             try {
                 Files.remove(workDir);
@@ -135,13 +136,14 @@ class ContainerBase {
     }
 
     static void doInstall(final String displayName, final String artifactId, final String inEnvironment,
-                                  final SshKey sshKey, GitConfiguration git, final String application,
-                                  final String versionAndClassifier, final PrintStream out, final GlobalConfiguration configuration,
-                                  final File workDir, final File downloadedFile) throws IOException {
+                          final SshKey sshKey, GitConfiguration git, final String application,
+                          final String versionAndClassifier, final PrintStream out, final GlobalConfiguration configuration,
+                          final File workDir, final File downloadedFile,
+                          final String subFolder) throws IOException {
         final File gitConfig = new File(workDir, artifactId + "-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
-        final File deploymentConfig = new File(gitConfig, application + "/deployments.json");
+        final File deploymentConfig = new File(gitConfig, application + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json");
         if (!deploymentConfig.isFile()) {
             throw new IllegalStateException("No deployments.json in provisioning repository: " + git.repository());
         }
@@ -157,26 +159,26 @@ class ContainerBase {
                     out.println("Deploying " + displayName + " " + versionAndClassifier + " on " + host);
 
                     try (final Ssh ssh = new Ssh(
-                        // recreate a ssh key using global config
-                        new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
-                            ofNullable(sshKey.getPassphrase())
-                                .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
-                                    .map(s -> new String(Base64.getDecoder().decode(s)))
-                                    .orElse(null)))),
-                        Substitutors.resolveWithVariables(
-                            ofNullable(env.getEnvironment().getUser()).orElse(System.getProperty("user.name")) + '@' + host,
-                            env.getEnvironment().getProperties(),
-                            app.getProperties()
-                        ))) {
+                            // recreate a ssh key using global config
+                            new com.tomitribe.tsm.ssh.SshKey(sshKey.getPath(), Substitutors.resolveWithVariables(
+                                    ofNullable(sshKey.getPassphrase())
+                                            .orElseGet(() -> ofNullable(configuration.read("ssh.passphrase", "git.passphrase"))
+                                                    .map(s -> new String(Base64.getDecoder().decode(s)))
+                                                    .orElse(null)))),
+                            Substitutors.resolveWithVariables(
+                                    ofNullable(env.getEnvironment().getUser()).orElse(System.getProperty("user.name")) + '@' + host,
+                                    env.getEnvironment().getProperties(),
+                                    app.getProperties()
+                            ))) {
 
                         final String fixedBase = env.getEnvironment().getBase() + (env.getEnvironment().getBase().endsWith("/") ? "" : "/");
                         final String remoteWorkDir = fixedBase + "work-provisioning/";
                         final String target = remoteWorkDir + downloadedFile.getName();
                         final String targetFolder = fixedBase + artifactId + "/" + artifactId + '-' + versionAndClassifier + '/';
                         ssh.exec(String.format("mkdir -p \"%s\" \"%s\"", remoteWorkDir, targetFolder))
-                            .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
-                            .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
-                            .exec(String.format("rm \"%s\"", target));
+                                .scp(downloadedFile, target, new ProgressBar(out, "Installing " + displayName + " on " + host))
+                                .exec(String.format("tar xvf \"%s\" -C \"%s\" --strip 1", target, targetFolder))
+                                .exec(String.format("rm \"%s\"", target));
 
                         out.println(displayName + " setup in " + targetFolder + " for host " + host);
                     }
@@ -198,8 +200,8 @@ class ContainerBase {
             urlConnection.setRequestProperty("Authorization", security.getAuthorization());
             final Collection<Artifact> artifacts = new MapperBuilder().setAccessModeName("field").build().readCollection(urlConnection.getInputStream(), new JohnzonParameterizedType(List.class, Artifact.class));
             artifacts.stream()
-                .filter(a -> ("ACTIVATED".equals(a.getState()) || "ARCHIVED".equals(a.getState())) && a.getSize() > 0 && "tar.gz".equals(a.getType()) && (includeSnapshots || !a.getVersion().contains("SNAPSHOT")))
-                .forEach(a -> lists.add(a.getVersion()));
+                    .filter(a -> ("ACTIVATED".equals(a.getState()) || "ARCHIVED".equals(a.getState())) && a.getSize() > 0 && "tar.gz".equals(a.getType()) && (includeSnapshots || !a.getVersion().contains("SNAPSHOT")))
+                    .forEach(a -> lists.add(a.getVersion()));
         } finally {
             urlConnection.disconnect();
         }

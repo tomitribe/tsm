@@ -35,6 +35,7 @@ public class Tribestream {
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
+                               @Option("sub-directory") final String subFolder,
                                final TomitribeTribestreamMetadataPrincipal security,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -45,7 +46,7 @@ public class Tribestream {
         ContainerBase.tribestreamInstall(
             "Tribestream",
             "com.tomitribe.tribestream", "tribestream", null,
-            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
+            workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl, subFolder);
     }
 
     @Command(interceptedBy = DefaultParameters.class)

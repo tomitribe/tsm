@@ -52,6 +52,7 @@ public class Node {
                                @Option("download-root") @Default("https://nodejs.org/dist/") final String root,
                                @Option("version") @Default("v7.2.1") final String version,
                                @Option("classifier") @Default("linux-x64") final String classifier,
+                               @Option("sub-directory") final String subFolder,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
                                @Notifier.Description final String application,
@@ -74,7 +75,7 @@ public class Node {
         final File gitConfig = new File(workDir, application + "-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
-        final File deploymentConfig = new File(gitConfig, application + "/deployments.json");
+        final File deploymentConfig = new File(gitConfig, application + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json");
         if (!deploymentConfig.isFile()) {
             throw new IllegalStateException("No deployments.json in provisioning repository: " + git.repository());
         }

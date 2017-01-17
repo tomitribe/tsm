@@ -53,6 +53,7 @@ public class TomEE {
     public static void install(@Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
+                               @Option("sub-directory") final String subFolder,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
                                final String application,
@@ -80,7 +81,7 @@ public class TomEE {
         try {
             ContainerBase.doInstall(
                 "TomEE " + classifier, artifactId, environment, sshKey, git, application,
-                version + ofNullable(classifier).map(c -> '-' + c).orElse(""), out, configuration, workDir, downloadedFile);
+                version + ofNullable(classifier).map(c -> '-' + c).orElse(""), out, configuration, workDir, downloadedFile, subFolder);
         } finally {
             try {
                 Files.remove(workDir);

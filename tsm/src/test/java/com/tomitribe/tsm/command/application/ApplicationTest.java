@@ -92,6 +92,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-start-work/"), -1, -1,
+                null,
                 new GitConfiguration(git.directory(), "ApplicationTest-start", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 "start", new PrintStream(out), ENVIRONMENT);
 
@@ -108,6 +109,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-stop-work/"), -1, -1,
+                null,
                 new GitConfiguration(git.directory(), "ApplicationTest-stop", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 "stop", new PrintStream(out), ENVIRONMENT);
 
@@ -124,6 +126,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-ping-work/"), -1, -1,
+                null,
                 new GitConfiguration(git.directory(), "ApplicationTest-ping", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 "ping", new PrintStream(out), ENVIRONMENT);
 
@@ -141,6 +144,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-tg-work/"),
+                null,
                 new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 new LocalFileRepository(new File("target/missing")),
                 new Nexus("http://faked", null, null) {
@@ -211,7 +215,8 @@ public class ApplicationTest {
                             new LocalFileRepository(new File("target/missing")),
                             new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                             new File("target/ApplicationTest-install-work/"),
-                            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
+                            null, "0.69", "8u60", "prod", "com.foo.bar", "art", "1.0", -1, -1, new Duration("-1 minutes"),
+                            false, false, null,
                             new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
                 } catch (final IOException e) {
                     throw new IllegalStateException(e);
@@ -227,7 +232,8 @@ public class ApplicationTest {
                             Nexus.class, Nexus.class, GitConfiguration.class, LocalFileRepository.class,
                             SshKey.class, File.class, String.class, String.class, String.class, String.class,
                             String.class, String.class, String.class, int.class, int.class, Duration.class,
-                            boolean.class, boolean.class, PrintStream.class, PrintStream.class, Environment.class, GlobalConfiguration.class);
+                            boolean.class, boolean.class, String.class,
+                            PrintStream.class, PrintStream.class, Environment.class, GlobalConfiguration.class);
                 } catch (final NoSuchMethodException e) {
                     throw new IllegalStateException(e);
                 }
@@ -403,7 +409,8 @@ public class ApplicationTest {
                 new LocalFileRepository(new File("target/missing")),
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-configonly-onewebapp-work/"),
-                "7.0.1", null, "8u112", "prod", "configonly", -1, -1, new Duration("-1 minutes"), false, false,
+                "7.0.1", null, "8u112", "prod", "configonly", -1, -1,
+                new Duration("-1 minutes"), false, false, null,
                 new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         final String meta = IO.slurp(new File(ssh.getHome(), "configonly/prod/conf/tsm-metadata.json"))
@@ -480,7 +487,8 @@ public class ApplicationTest {
                 new LocalFileRepository(new File("target/missing")),
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-configonly-onewebapp-filtering-work/"),
-                "7.0.2", null, "8u112", "prod", "configOnlyOneWebappFiltering", -1, -1, new Duration("-1 minutes"), false, false,
+                "7.0.2", null, "8u112", "prod", "configOnlyOneWebappFiltering",
+                -1, -1, new Duration("-1 minutes"), false, false, null,
                 new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         final String meta = IO.slurp(new File(ssh.getHome(), "configOnlyOneWebappFiltering/prod/conf/tsm-metadata.json"))
@@ -556,7 +564,8 @@ public class ApplicationTest {
                 new LocalFileRepository(new File("target/missing")),
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-configonly-apps-work/"),
-                "7.0.1", null, "8u112", "prod", "configonly_apps", -1, -1, new Duration("-1 minutes"), false, false,
+                "7.0.1", null, "8u112", "prod", "configonly_apps", -1,
+                -1, new Duration("-1 minutes"), false, false, null,
                 new PrintStream(System.out), new PrintStream(System.err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         assertEquals("lib => com.company:superar:0.1.2:rar", IO.slurp(new File(ssh.getHome(), "configonly_apps/prod/apps/test.rar")).trim());
@@ -600,7 +609,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-exec/"),
-                -1, -1,
+                -1, -1, null,
                 new GitConfiguration(git.directory(), "ApplicationTest-install-envs", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 "exec", "exectest %environment",
                 new PrintStream(out),
@@ -651,7 +660,8 @@ public class ApplicationTest {
                 new LocalFileRepository(new File("target/missing")),
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-install-envs/"),
-                null, "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0", -1, -1, new Duration("-1 minutes"), false, false,
+                null, "0.69", "8u60", "prod,other", "com.foo.bar", "art2", "1.0",
+                -1, -1, new Duration("-1 minutes"), false, false, null,
                 new PrintStream(out), new PrintStream(err), ENVIRONMENT, new GlobalConfiguration(new File("")));
 
         assertEquals("e=prod", IO.readString(new File(ssh.getHome(), "art2/prod/conf/someconf.properties"))); // filtering

@@ -69,6 +69,7 @@ public class Java8 {
             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
             @Option("environment") final String inEnvironment,
             @Option("ssh.") final SshKey sshKey,
+            @Option("sub-directory") final String subFolder,
             final LocalFileRepository localFileRepository,
             final GitConfiguration git,
             final String application,
@@ -91,7 +92,7 @@ public class Java8 {
         final File gitConfig = new File(workDir, "java8-jce-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
-        final File deploymentConfig = new File(gitConfig, application + "/deployments.json");
+        final File deploymentConfig = new File(gitConfig, application + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json");
         if (!deploymentConfig.isFile()) {
             throw new IllegalStateException("No deployments.json in provisioning repository: " + git.repository());
         }
@@ -141,6 +142,7 @@ public class Java8 {
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("environment") final String inEnvironment,
                                @Option("ssh.") final SshKey sshKey,
+                               @Option("sub-directory") final String subFolder,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
                                final String application,
@@ -214,7 +216,7 @@ public class Java8 {
         final File gitConfig = new File(workDir, "java8-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
-        final File deploymentConfig = new File(gitConfig, application + "/deployments.json");
+        final File deploymentConfig = new File(gitConfig, application + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json");
         if (!deploymentConfig.isFile()) {
             throw new IllegalStateException("No deployments.json in provisioning repository: " + git.repository());
         }

@@ -37,6 +37,7 @@ public class Tag {
                                @Option("environment") final String environment,
                                @Option("ssh.") final SshKey sshKey,
                                @Option("tomitribe.baseUrl") @Default("https://www.tomitribe.com") final String baseUrl,
+                               @Option("sub-directory") final String subFolder,
                                final TomitribeTribestreamMetadataPrincipal security,
                                final LocalFileRepository localFileRepository,
                                final GitConfiguration git,
@@ -46,7 +47,7 @@ public class Tag {
                                final GlobalConfiguration configuration) throws IOException, ScriptException {
         ContainerBase.tribestreamInstall("TAG",
                 "com.tomitribe.tribestream", "tribestream-access-gateway", null,
-                workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl);
+                workDirBase, environment, sshKey, security, localFileRepository, git, application, version, out, configuration, baseUrl, subFolder);
     }
 
     @Command(interceptedBy = DefaultParameters.class)

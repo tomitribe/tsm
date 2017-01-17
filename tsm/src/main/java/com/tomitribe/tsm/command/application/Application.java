@@ -89,12 +89,13 @@ public class Application {
                              @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                              @Option("node-index") @Default("-1") final int nodeIndex,
                              @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                             @Option("sub-directory") final String subFolder,
                              final GitConfiguration git,
                              @Notifier.Description final String artifactId,
                              @Out final PrintStream out,
                              final Environment crestEnv) throws IOException {
         execute(
-                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Starting %s on %s for environment %s", "\"%s/bin/startup\"");
     }
 
@@ -104,6 +105,7 @@ public class Application {
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                            @Option("sub-directory") final String subFolder,
                             final GitConfiguration git,
                             @Notifier.Description final String artifactId,
                             final String inCmd,
@@ -118,7 +120,7 @@ public class Application {
             cmd = inCmd;
         }
         execute(
-                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Executing command for %s on %s for environment %s", cmd);
     }
 
@@ -128,12 +130,13 @@ public class Application {
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                            @Option("sub-directory") final String subFolder,
                             final GitConfiguration git,
                             @Notifier.Description final String artifactId,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Stopping %s on %s for environment %s", "\"%s/bin/shutdown\" 1200 -force");
     }
 
@@ -143,12 +146,13 @@ public class Application {
                                @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                @Option("node-index") @Default("-1") final int nodeIndex,
                                @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                               @Option("sub-directory") final String subFolder,
                                final GitConfiguration git,
                                @Notifier.Description final String artifactId,
                                @Out final PrintStream out,
                                final Environment crestEnv) throws IOException {
         execute(
-                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
+                environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, crestEnv,
                 "Restarting %s on %s for environment %s", "\"%s/bin/shutdown\"", "sleep 3", "\"%s/bin/startup\"");
     }
 
@@ -158,12 +162,13 @@ public class Application {
                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                             @Option("node-index") @Default("-1") final int nodeIndex,
                             @Option("node-grouping-size") @Default("-1") final int nodeGroup,
+                            @Option("sub-directory") final String subFolder,
                             final GitConfiguration git,
                             final String artifactId,
                             @Out final PrintStream out,
                             final Environment crestEnv) throws IOException {
         execute(
-                environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup,
+                environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup,
                 "Testing %s on %s for environment %s", e -> {
                     final String url = "http://127.0.0.1:" + e.getProperties().get("tsm.https");
                     return new String[]{ // GET is often in PCI zones but not curl so try it first
@@ -177,6 +182,7 @@ public class Application {
                                             @Option("environment") final String inEnvironment,
                                             @Option("ssh.") final SshKey sshKey,
                                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
+                                            @Option("sub-directory") final String subFolder,
                                             final GitConfiguration git,
                                             final LocalFileRepository localFileRepository,
                                             final Nexus nexus,
@@ -196,7 +202,7 @@ public class Application {
             nexus.download(out, segments[0], segments[1], segments[2], segments.length > 3 ? segments[3] : null, "tar.gz").to(tarGz);
         }
 
-        final AtomicReference<File> clone = new AtomicReference<>(gitClone(git, artifactId, out, workDir));
+        final AtomicReference<File> clone = new AtomicReference<>(gitClone(git, artifactId, subFolder, out, workDir));
         try (final FileReader reader = new FileReader(clone.get())) {
             final Deployments.Application app = Deployments.read(reader);
             app.findEnvironments(inEnvironment).forEach(contextualEnvironment -> {
@@ -261,7 +267,7 @@ public class Application {
                         final File root = clone.get().getParentFile().getParentFile();
                         final File potentialCopy = git.reset(root, out);
                         if (potentialCopy != root) {
-                            clone.set(new File(potentialCopy, artifactId + "/deployments.json"));
+                            clone.set(new File(potentialCopy, artifactId + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json"));
                         }
                         out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
                     }
@@ -309,6 +315,7 @@ public class Application {
                                     @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
                                     @Option("as-service") final boolean asService,
                                     @Option("restart") @Default("false") final boolean restart,
+                                    @Option("sub-directory") final String subFolder,
                                     @Out final PrintStream out,
                                     @Out final PrintStream err,
                                     final Environment crestEnv,
@@ -316,7 +323,7 @@ public class Application {
         install(
                 null, null, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
                 null, artifactId, null, // see install() for details
-                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                nodeIndex, nodeGroup, pause, asService, restart, subFolder, out, err, crestEnv, configuration);
     }
 
     private static File download(final Nexus nexus, final LocalFileRepository localFileRepository,
@@ -366,6 +373,7 @@ public class Application {
                                          @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
                                          @Option("as-service") final boolean asService,
                                          @Option("restart") @Default("false") final boolean restart,
+                                         @Option("sub-directory") final String subFolder,
                                          @Out final PrintStream out,
                                          @Out final PrintStream err,
                                          final Environment crestEnv,
@@ -373,7 +381,7 @@ public class Application {
         install(
                 nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
                 null, artifactId, null, // see install() for details
-                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                nodeIndex, nodeGroup, pause, asService, restart, subFolder, out, err, crestEnv, configuration);
     }
 
     // same as install but without groupId/artifactId (read from deployments.json)
@@ -395,6 +403,7 @@ public class Application {
                                     @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause,
                                     @Option("as-service") final boolean asService,
                                     @Option("restart") @Default("false") final boolean restart,
+                                    @Option("sub-directory") final String subFolder,
                                     @Out final PrintStream out,
                                     @Out final PrintStream err,
                                     final Environment crestEnv,
@@ -402,7 +411,7 @@ public class Application {
         install(
                 nexus, nexusLib, git, localFileRepository, sshKey, workDirBase, tomeeVersion, tribestreamVersion, javaVersion, environment,
                 null, artifactId, null, // see install() for details
-                nodeIndex, nodeGroup, pause, asService, restart, out, err, crestEnv, configuration);
+                nodeIndex, nodeGroup, pause, asService, restart, subFolder, out, err, crestEnv, configuration);
     }
 
     // meta command reading tsm-metadata.json to set git, server, env, app and java config
@@ -418,6 +427,7 @@ public class Application {
                                            @Option("node-grouping-size") @Default("-1") final int nodeGroup,
                                            @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause,
                                            @Option("restart") @Default("false") final boolean restart,
+                                           @Option("sub-directory") final String subFolder,
                                            @Out final PrintStream out,
                                            @Out final PrintStream err,
                                            @Notifier.Description final File tsmMetadata,
@@ -470,7 +480,7 @@ public class Application {
         install(
                 nexus, nexusLib, git, localFileRepository, sshKey, workDirBase,
                 tomee, tribestream, java, environment, groupId, artifactId, version,
-                nodeIndex, nodeGroup, pause, false, restart, out, err, crestEnv, configuration);
+                nodeIndex, nodeGroup, pause, false, restart, subFolder, out, err, crestEnv, configuration);
     }
 
     // this is the master logic for all deployments (application, config only etc...)
@@ -491,6 +501,7 @@ public class Application {
                                @Option("pause-between-deployments") @Default("-1 minutes") final Duration pause, // httpd uses 60s by default
                                @Option("as-service") final boolean asService,
                                @Option("restart") @Default("false") final boolean restart,
+                               @Option("sub-directory") final String subFolder,
                                @Out final PrintStream out,
                                @Out final PrintStream err,
                                final Environment crestEnv,
@@ -502,7 +513,7 @@ public class Application {
         final String appWorkName = ofNullable(inGroupId).orElse("-") + '_' + inArtifactId;
         final File workDir = TempDir.newTempDir(workDirBase, appWorkName);
 
-        final AtomicReference<File> deploymentConfig = new AtomicReference<>(gitClone(git, inArtifactId, out, workDir));
+        final AtomicReference<File> deploymentConfig = new AtomicReference<>(gitClone(git, inArtifactId, subFolder, out, workDir));
 
         try (final FileReader reader = new FileReader(deploymentConfig.get())) {
             final Deployments.Application app = Deployments.read(reader);
@@ -662,10 +673,10 @@ public class Application {
                             try {
                                 IO.writeString(tmp,
                                         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                                        "<tomee>\n" +
-                                        "  <Deployments dir=\"apps\" />\n" +
-                                        "</tomee>\n" +
-                                        "\n");
+                                                "<tomee>\n" +
+                                                "  <Deployments dir=\"apps\" />\n" +
+                                                "</tomee>\n" +
+                                                "\n");
                             } catch (final IOException e) {
                                 throw new IllegalStateException(e);
                             }
@@ -842,7 +853,7 @@ public class Application {
                         final File root = deploymentConfig.get().getParentFile().getParentFile();
                         final File potentialCopy = git.reset(root, out);
                         if (potentialCopy != root) { // reset failed, the repo has been checked out again
-                            deploymentConfig.set(new File(potentialCopy, inArtifactId + "/deployments.json"));
+                            deploymentConfig.set(new File(potentialCopy, inArtifactId + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json"));
                         }
                         reInitFiltering.set(false);
 
@@ -1079,12 +1090,13 @@ public class Application {
     }
 
     private static File gitClone(final GitConfiguration git, final String base,
+                                 final String subFolder,
                                  final PrintStream out, final File workDir) {
         final File gitConfig = new File(workDir, base + "-git-config");
         git.clone(gitConfig, new PrintWriter(out));
 
         // here we suppose application name == artifactId
-        final File deploymentConfig = new File(gitConfig, base + "/deployments.json");
+        final File deploymentConfig = new File(gitConfig, base + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json");
         if (!deploymentConfig.isFile()) {
             throw new IllegalStateException("No deployments.json in provisioning repository: " + git.repository());
         }
@@ -1103,6 +1115,7 @@ public class Application {
     }
 
     private static void execute(final String environment,
+                                final String subFolder,
                                 final SshKey sshKey,
                                 final File workDirBase,
                                 final GitConfiguration git,
@@ -1113,10 +1126,11 @@ public class Application {
                                 final Environment crestEnv,
                                 final String textByHost,
                                 final String... cmds) throws IOException {
-        execute(environment, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, textByHost, e -> cmds, crestEnv);
+        execute(environment, subFolder, sshKey, workDirBase, git, artifactId, out, nodeIndex, nodeGroup, textByHost, e -> cmds, crestEnv);
     }
 
     private static void execute(final String inEnvironment,
+                                final String subFolder,
                                 final SshKey sshKey,
                                 final File workDirBase,
                                 final GitConfiguration git,
@@ -1129,7 +1143,7 @@ public class Application {
                                 final Environment crestEnv) throws IOException {
         final File workDir = TempDir.newTempDir(workDirBase, artifactId);
 
-        final File deploymentConfig = gitClone(git, artifactId, out, workDir);
+        final File deploymentConfig = gitClone(git, artifactId, subFolder, out, workDir);
 
         try (final FileReader reader = new FileReader(deploymentConfig)) {
             final Deployments.Application app = Deployments.read(reader);

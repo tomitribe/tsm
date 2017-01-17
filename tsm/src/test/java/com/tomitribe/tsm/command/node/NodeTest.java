@@ -66,7 +66,7 @@ public class NodeTest {
                 new File("target/NodeTest-install-work/"),
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
-                "https://nodejs.org/dist/", "v7.2.1", "linux-x64",
+                "https://nodejs.org/dist/", "v7.2.1", "linux-x64", null,
                 new LocalFileRepository(new File("target/missing")),
                 new GitConfiguration(git.directory(), "NodeTest-tg", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 "node_install", new PrintStream(out), ENVIRONMENT.findService(GlobalConfiguration.class));
