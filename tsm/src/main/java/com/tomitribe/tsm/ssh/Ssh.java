@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -30,6 +31,7 @@ import static java.util.Optional.ofNullable;
 
 public final class Ssh implements AutoCloseable {
     private static final int SSH_TIMEOUT = Integer.getInteger("tsm.ssh.timeout", 120000);
+    private static final boolean DEBUG = Boolean.getBoolean("tsm.ssh.debug");
 
     private final Session session;
 
@@ -62,6 +64,9 @@ public final class Ssh implements AutoCloseable {
     }
 
     public Ssh exec(final String command) {
+        if (DEBUG) {
+            System.out.println("[SSH] Executing '" + command + "'");
+        }
         Channel channel = null;
         try {
             channel = redirectStreams(openExecChannel(command));
@@ -73,7 +78,7 @@ public final class Ssh implements AutoCloseable {
                 final byte[] buffer = new byte[1024];
                 int length;
                 long retryUntil = -1;
-                while (channel.isConnected()) {
+                while (channel.isConnected() && !channel.isClosed()) {
                     // ensure to check available cause read() is blocking
                     final int available = inputStream.available();
                     if (available > 0 && (length = inputStream.read(buffer, 0, Math.min(buffer.length, available))) != -1) {
@@ -85,6 +90,9 @@ public final class Ssh implements AutoCloseable {
                             } else if (System.currentTimeMillis() - retryUntil >= 0) {
                                 break;
                             }
+                            if (DEBUG) {
+                                System.out.println("[SSH][Retry] until " + new Date(retryUntil));
+                            }
                         }
                         try {
                             Thread.sleep(250);
@@ -93,6 +101,9 @@ public final class Ssh implements AutoCloseable {
                             break;
                         }
                     }
+                }
+                if (DEBUG) {
+                    System.out.println("[SSH][Exit Status] " + channel.getExitStatus());
                 }
 
                 of(out.toByteArray()).map(String::new).filter(s -> !s.isEmpty())
