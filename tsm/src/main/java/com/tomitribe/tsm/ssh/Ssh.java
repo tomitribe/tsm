@@ -31,7 +31,7 @@ import static java.util.Optional.ofNullable;
 
 public final class Ssh implements AutoCloseable {
     private static final int SSH_TIMEOUT = Integer.getInteger("tsm.ssh.timeout", 120000);
-    private static final boolean DEBUG = Boolean.getBoolean("tsm.ssh.debug");
+    private static final boolean DEBUG = Boolean.getBoolean("tsm.ssh.debug") || Boolean.getBoolean("tsm.debug");
 
     private final Session session;
 

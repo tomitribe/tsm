@@ -38,8 +38,10 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -212,6 +214,16 @@ public class Java8 {
             new Http().download(url, jdkDestination, new ProgressBar(out, "Downloading JDK " + version), "Cookie", "oraclelicense=accept-securebackup-cookie");
         }
         out.println("Downloaded JDK in " + jdkDestination + " (" + new Size(jdkDestination.length(), SizeUnit.BYTES).toString().toLowerCase(Locale.ENGLISH) + ")");
+        if (jdkDestination.length() < 10000) { // check it was not a login redirection, login page is about 2123bytes
+            try (final InputStream is = new FileInputStream(jdkDestination)) {
+                final String content = IO.slurp(is);
+                if (content.contains("<html") && content.contains("<p id=\"trademark\">")) {
+                    throw new IllegalStateException(
+                            "Downloaded the login page on oracle website, either put the jdk in your maven 2 repository at " + cachedJdk +
+                                    " or use the last version from oracle");
+                }
+            }
+        }
 
         final File gitConfig = new File(workDir, "java8-git-config");
         git.clone(gitConfig, new PrintWriter(out));

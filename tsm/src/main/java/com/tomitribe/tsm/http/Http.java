@@ -30,6 +30,8 @@ import java.util.function.Consumer;
 import static java.util.Optional.ofNullable;
 
 public class Http {
+    private static final boolean DEBUG = Boolean.getBoolean("tsm.ssh.debug") || Boolean.getBoolean("tsm.debug");
+
     public File download(final String source,
                          final File target,
                          final Consumer<Double> progressPerCentConsumer,
@@ -71,7 +73,11 @@ public class Http {
 
                 final int responseCode = connection.getResponseCode();
                 if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-                    return download(connection.getHeaderField("Location"), target, progressPerCentConsumer, headers);
+                    final String location = connection.getHeaderField("Location");
+                    if (DEBUG) {
+                        System.out.println("[HTTP] Following redirection: " + location);
+                    }
+                    return download(location, target, progressPerCentConsumer, headers);
                 } else if (responseCode > 299) {
                     throw new IllegalStateException(
                         "Can't download " + source + ": " +
