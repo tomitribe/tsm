@@ -226,9 +226,12 @@ public final class Ssh implements AutoCloseable {
                 final StringBuilder sb = new StringBuilder();
 
                 int c = in.read();
-                while (c > 0 && c != '\n') {
+                while (c > 0 && sb.length() < 8192 /*limit*/) {
                     sb.append((char) c);
                     c = in.read();
+                    if (c == 0) {
+                        return;
+                    }
                 }
                 throw new IllegalStateException("SCP error: " + sb.toString());
         }
