@@ -183,6 +183,7 @@ public class Application {
                                             @Option("ssh.") final SshKey sshKey,
                                             @Option("work-dir-base") @Default("${java.io.tmpdir}/tsm") final File workDirBase,
                                             @Option("sub-directory") final String subFolder,
+                                            @Option("restart") @Default("false") final boolean restart,
                                             final GitConfiguration git,
                                             final LocalFileRepository localFileRepository,
                                             final Nexus nexus,
@@ -270,7 +271,13 @@ public class Application {
                         if (potentialCopy != root) {
                             clone.set(new File(potentialCopy, artifactId + ofNullable(subFolder).map(s -> "/" + s).orElse("") + "/deployments.json"));
                         }
-                        out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
+
+                        if (!restart) {
+                            out.println(segments[1] + " setup in " + targetFolder + " for host " + host);
+                        } else {
+                            out.println("Restarting " + targetFolder + " for host " + host);
+                            ssh.exec("\"" + targetFolder + "bin/startup\"");
+                        }
                     }
                 });
             });

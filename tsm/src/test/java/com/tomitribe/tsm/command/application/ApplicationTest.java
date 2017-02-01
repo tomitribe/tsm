@@ -144,7 +144,7 @@ public class ApplicationTest {
                 "prod",
                 new SshKey(ssh.getKeyPath(), ssh.getKeyPassphrase()),
                 new File("target/ApplicationTest-tg-work/"),
-                null,
+                null, false,
                 new GitConfiguration(git.directory(), "ApplicationTest-tg", "master", null, ssh.getKeyPath().getAbsolutePath(), ssh.getKeyPassphrase()),
                 new LocalFileRepository(new File("target/missing")),
                 new Nexus("http://faked", null, null) {
@@ -168,7 +168,9 @@ public class ApplicationTest {
                 "tar xvf \"/work-provisioning/foo-1.tar.gz\" -C \"/foo/foo-1/\" --strip 1",
                 "rm \"/work-provisioning/foo-1.tar.gz\""), ssh.commands());
         assertEquals("install.tar.gz", IO.readString(new File(ssh.getHome(), "work-provisioning/foo-1.tar.gz")));
-        assertTrue(new String(out.toByteArray()).contains("foo setup in /foo/foo-1/ for host localhost:" + ssh.port()));
+
+        final String output = new String(out.toByteArray());
+        assertTrue(output, output.contains("foo setup in /foo/foo-1/ for host localhost:" + ssh.port()));
     }
 
     @Test
