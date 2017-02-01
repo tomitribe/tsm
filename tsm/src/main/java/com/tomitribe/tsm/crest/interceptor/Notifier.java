@@ -93,7 +93,7 @@ public class Notifier {
     /**
      * Marks a <b>single</b> parameter of the method as being used in the notification as human identifier.
      * <p>
-     * Note: if needed later we can support something like @Description("%1s -> %2s") using Formatter but this is more fragile.
+     * Note: if needed later we can support something like @Description("%1s and %2s") using Formatter but this is more fragile.
      */
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.PARAMETER)
