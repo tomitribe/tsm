@@ -219,6 +219,9 @@ public class Application {
                 env.getHosts().forEach(host -> {
                     out.println("Installing " + segments[1] + " to " + host);
 
+                    env.getProperties().putIfAbsent("host", host);
+                    env.getProperties().putIfAbsent("environment", contextualEnvironment.getName());
+
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
 
                     final Map<String, File> libs = ofNullable(env.getCustomLibs()).orElse(emptyMap()).entrySet().stream()
