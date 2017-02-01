@@ -218,9 +218,7 @@ public class Application {
 
                 env.getHosts().forEach(host -> {
                     out.println("Installing " + segments[1] + " to " + host);
-
-                    env.getProperties().putIfAbsent("host", host);
-                    env.getProperties().putIfAbsent("environment", contextualEnvironment.getName());
+                    env.getProperties().put("host", host);
 
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
 
@@ -599,8 +597,7 @@ public class Application {
 
                     // override by host variables
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
-                    env.getProperties().putIfAbsent("host", host);
-                    env.getProperties().putIfAbsent("environment", envName);
+                    env.getProperties().put("host", host);
 
                     if (nodeIndex >= 0 && !selector.isSelected(currentIdx.getAndIncrement())) {
                         return;
@@ -1167,7 +1164,7 @@ public class Application {
 
                 environment.getHosts().forEach(host -> {
                     byHostEntries.forEach((k, v) -> env.getEnvironment().getProperties().put(k, v.next()));
-                    env.getEnvironment().getProperties().putIfAbsent("host", host);
+                    env.getEnvironment().getProperties().put("host", host);
                     env.getEnvironment().getProperties().putIfAbsent("environment", env.getName());
 
                     if (!selector.isSelected(currentIdx.getAndIncrement())) {
