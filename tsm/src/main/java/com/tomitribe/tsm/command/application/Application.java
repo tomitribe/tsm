@@ -910,9 +910,10 @@ public class Application {
     private static File findLib(final Nexus nexus, final Nexus nexusLib, final LocalFileRepository fileRepository,
                                 final PrintStream out, final File workDir, final String lib) {
         final String[] segments = lib.split(":");
-        final File local = new File(workDir, segments[1] + ".jar");
+        final File local = new File(workDir, segments[1] + (segments.length >= 5 ? '-' + segments[4] : "") + ".jar");
         if (!local.isFile()) {
-            doDownload(nexus, nexusLib, fileRepository, out, local, segments[0], segments[1], segments[2], null, "jar");
+            doDownload(nexus, nexusLib, fileRepository, out, local, segments[0], segments[1], segments[2],
+                    segments.length >= 4 ? segments[3] : "jar", segments.length >= 5 ? segments[4] : null);
         }
         return local;
     }
