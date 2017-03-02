@@ -224,7 +224,7 @@ public class Application {
                     byHostEntries.forEach((k, v) -> env.getProperties().put(k, v.next()));
 
                     final Map<String, File> libs = ofNullable(env.getCustomLibs()).orElse(emptyMap()).entrySet().stream()
-                            .collect(toMap(Map.Entry::getKey, e -> findLib(nexus, nexusLib, out, workDir, e.getValue())));
+                            .collect(toMap(Map.Entry::getKey, e -> findLib(nexus, nexusLib, localFileRepository, out, workDir, e.getValue())));
 
                     final String fixedBase = env.getBase() + (env.getBase().endsWith("/") ? "" : "/");
                     final String remoteWorkDir = fixedBase + "work-provisioning/";
@@ -549,8 +549,10 @@ public class Application {
                 final Map<String, File> additionalApps = new TreeMap<>();
                 final AtomicReference<String[]> singleWebapp = new AtomicReference<>(); // reused if we have a single webapp, don't parse N times
                 if (nexusLib != null) {
-                    ofNullable(env.getLibs()).orElse(emptyList()).forEach(lib -> additionalLibs.add(findLib(nexus, nexusLib, out, workDir, lib)));
-                    ofNullable(env.getCustomLibs()).orElse(emptyMap()).forEach((target, coords) -> additionalCustomLibs.put(target, findLib(nexus, nexusLib, out, workDir, coords)));
+                    ofNullable(env.getLibs()).orElse(emptyList())
+                            .forEach(lib -> additionalLibs.add(findLib(nexus, nexusLib, localFileRepository, out, workDir, lib)));
+                    ofNullable(env.getCustomLibs()).orElse(emptyMap())
+                            .forEach((target, coords) -> additionalCustomLibs.put(target, findLib(nexus, nexusLib, localFileRepository, out, workDir, coords)));
                     ofNullable(env.getWebapps()).orElse(emptyList()).forEach(war -> {
                         final String[] segments = war.replaceAll("\\?.*", "").split(":");
                         final int contextIdx = war.indexOf("?context=");
@@ -905,17 +907,12 @@ public class Application {
         }
     }
 
-    private static File findLib(final Nexus nexus, final Nexus nexusLib, final PrintStream out, final File workDir, final String lib) {
+    private static File findLib(final Nexus nexus, final Nexus nexusLib, final LocalFileRepository fileRepository,
+                                final PrintStream out, final File workDir, final String lib) {
         final String[] segments = lib.split(":");
         final File local = new File(workDir, segments[1] + ".jar");
         if (!local.isFile()) {
-            try {
-                nexusLib.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-            } catch (final IllegalStateException ise) {
-                if (nexus != null) {
-                    nexus.download(out, segments[0], segments[1], segments[2], null, "jar").to(local);
-                }
-            }
+            doDownload(nexus, nexusLib, fileRepository, out, local, segments[0], segments[1], segments[2], null, "jar");
         }
         return local;
     }
