@@ -120,7 +120,8 @@ public final class Ssh implements AutoCloseable {
     }
 
     public Ssh scp(final File file, final String target, final Consumer<Double> progressTracker) {
-        final String cmd = "scp -t " + target;
+        final boolean quote = target.contains("$");
+        final String cmd = "scp -t " + (quote ? "'" + target + "'" : target);
         ChannelExec channel = null;
         try {
             channel = openExecChannel(cmd);
